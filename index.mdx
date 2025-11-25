@@ -1,97 +1,54 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Granular Energy API Documentation"
+description: "Welcome to the Granular Energy Data Upload API documentation"
 ---
 
-## Setting up
+## Overview
 
-Get your documentation site up and running in minutes.
+The Granular Energy Data Upload API allows you to upload and manage energy generation and consumption data for your organization. This API supports:
+
+- **Generation Data Upload** - Upload metering data from renewable energy generation sources
+- **Consumption Data Upload** - Upload energy consumption data for tracking and matching
+- **ESNA Integration** - Manage ESNA (Exempt Supplier Notification Agent) related data and contracts
+
+## Getting Started
+
+To use the Granular Energy API, you'll need:
+
+1. An API key with the appropriate scopes for your use case
+2. Valid metering point references configured in your organization
+3. Energy data in the required CSV format
+
+Contact [support@granular-energy.com](mailto:support@granular-energy.com) to request API access.
+
+## API Reference
 
 <Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
+  title="View API Endpoints"
+  icon="code"
+  href="/api-reference"
   horizontal
 >
-  Follow our three step quickstart guide.
+  Browse the complete Data Upload API reference with interactive examples
 </Card>
 
-## Make it yours
+## Rate Limits
 
-Design a docs site that looks great and empowers your users.
+Most upload endpoints are subject to rate limits to protect service availability:
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+- **File Upload Endpoints**: Maximum 5 calls per minute
+- **File Size Limit**: 200MB maximum
+- **Measurements per File**: 1 million maximum
 
-## Create beautiful pages
+## Support
 
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
+If you need assistance or have questions about the API:
 
 <Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
+  title="Contact Support"
+  icon="envelope"
+  href="mailto:support@granular-energy.com"
+  horizontal
 >
-  Browse our showcase of exceptional documentation sites.
+  Email our support team for help with API integration
 </Card>

@@ -1,122 +1,2112 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
-  "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Granular Energy data upload API",
+    "description": "# rate limits\nIn order to protect our service, a number of API endpoints are subject to rate limits and a maximum payload size. Rate limits are expressed as the maximum number of calls that can be made to an API endpoint per minute per organization.\n\nWe reserve the right to change these limits with no, or limited, notice in order to protect the service for all our customers.",
+    "version": "1.0"
   },
-  "favicon": "/favicon.svg",
-  "navigation": {
-    "tabs": [
-      {
-        "tab": "Guides",
-        "groups": [
+  "servers": [
+    {
+      "url": "https://data-api.granular-energy.com",
+      "description": "Endpoint for Granular Energy data upload API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "generation",
+      "description": "Endpoints relating to generation data upload"
+    },
+    {
+      "name": "consumption",
+      "description": "Endpoints relating to consumption data upload"
+    },
+    {
+      "name": "esna",
+      "description": "Endpoints relating to ESNA metering data upload and contract management"
+    }
+  ],
+  "paths": {
+    "/generation-meters/files/upload": {
+      "post": {
+        "tags": [
+          "generation"
+        ],
+        "summary": "Upload file",
+        "description": "### File requirements\nUsing this route you can upload a CSV file of generation data for one or more metering points.\n\nPlease ensure that your file has the following columns:\n\n| column name | format | description |\n| --- | --- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `solar_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`. A date in `YYYY-MM-DD` format will be accepted as midnight in your organization's time zone.|\n| quantity | float | The quantity of energy (in kWh) generated through this metering point over this time step.|\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. If the optional `duration` query parameter is omitted then your file must begin with 2 measurements from the same metering point; The measurement duration for the file will be inferred from the interval between the `period_start` values of these first two measurements. If possible, please ensure that each payload contains all the data for the time period covered by the payload.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
+        "operationId": "uploadGenerationFile",
+        "parameters": [
           {
-            "group": "Getting started",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
+            "name": "duration",
+            "in": "query",
+            "description": "Optional duration of each measurement as an ISO8601 duration string. Must be one of `PT5M`, `PT15M`, `PT30M`, `PT1H`, `P1D` or `P1M`. If omitted, the duration will be inferred from the interval between `period_start` in the first two rows of the uploaded CSV, provided they represent the same `metering_point`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadId"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Generic429"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:production-file"
             ]
+          }
+        ]
+      }
+    },
+    "/consumption-meters/files/upload": {
+      "post": {
+        "tags": [
+          "consumption"
+        ],
+        "summary": "Upload file",
+        "description": "### File requirements\nUsing this route you can upload a CSV file of consumption data for one or more metering points.\n\nPlease ensure that your file has the following columns:\n\n| column name | format | description |\n| --- | --- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `building_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`. A date in `YYYY-MM-DD` format will be accepted as midnight in your organization's time zone.|\n| quantity | float | The quantity of energy (in kWh) consumed through this metering point over this time step.|\n|consumer (optional)|string|Optional disambiguating consumer information. See \"Disambiguation\" section below.|\n|&lt;tags> (optional)|string|Optional disambiguating tag information. See \"Disambiguation\" section below.|\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. If the optional `duration` query parameter is omitted then your file must begin with 2 measurements from the same metering point; The measurement duration for the file will be inferred from the interval between the `period_start` values of these first two measurements. If possible, please ensure that each payload contains all the data for the time period covered by the payload.\n### Disambiguation\nWhen uploading measurements with a monthly interval, it is possible for a metering point to change \"state\" (meaning its consumer and/or a tag value changes) midway through the measurement interval. To determine which state to assign the measurement to, you will need to add one or more \"disambiguation\" columns.\n\nThese can each be any tag key, or `consumer` (for the consumer reference). You only need to supply values for measurements that span a state change, though there is no harm in providing them on other rows. Any blank values will be ignored.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
+        "operationId": "uploadConsumptionFile",
+        "parameters": [
+          {
+            "name": "duration",
+            "in": "query",
+            "description": "Optional duration of each measurement as an ISO8601 duration string. Must be one of `PT5M`, `PT15M`, `PT30M`, `PT1H`, `P1D` or `P1M`. If omitted, the duration will be inferred from the interval between `period_start` in the first two rows of the uploaded CSV, provided they represent the same `metering_point`.",
+            "schema": {
+              "type": "string"
+            }
           },
           {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+            "name": "create_unknown_metering_points",
+            "in": "query",
+            "description": "Create any unknown metering points present in the uploaded CSV. These metering points will be created without any association to a couterparty or tags. The corresponding measurements will be ingested but they will not create any demand in the platform until the demand portfolio is updated for these metering points. Possible values to enable metering point creation are `1`, `yes` or `true`. Default is disabled.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadId"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Generic429"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:consumption-file"
             ]
+          }
+        ]
+      }
+    },
+    "/generation-meters/files/{id}": {
+      "get": {
+        "tags": [
+          "generation"
+        ],
+        "summary": "Check file upload status",
+        "description": "This endpoint allows you to check the processing status of an uploaded file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
+        "operationId": "getGenerationFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identifier for the file upload, returned from the _upload file_ `POST` endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationFileUpload"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:production-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/generation-meters/": {
+      "get": {
+        "tags": [
+          "generation"
+        ],
+        "summary": "List metering points",
+        "description": "List all generation metering points in your organization.",
+        "operationId": "listGenerationMeteringPoints",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationMeteringPoint"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:devices"
+            ]
+          }
+        ]
+      }
+    },
+    "/consumption-meters/files/{id}": {
+      "get": {
+        "tags": [
+          "consumption"
+        ],
+        "summary": "Check file upload status",
+        "description": "This endpoint allows you to check the processing status of an uploaded file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
+        "operationId": "getConsumptionFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identifier for the file upload, returned from the _upload file_ `POST` endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsumptionFileUpload"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:consumption-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/consumption-meters/": {
+      "get": {
+        "tags": [
+          "consumption"
+        ],
+        "summary": "List metering points",
+        "description": "List all consumption metering points in your organization.",
+        "operationId": "listConsumptionMeteringPoints",
+        "parameters": [
+          {
+            "name": "at_datetime",
+            "in": "query",
+            "description": "Optional ISO-8601 datetime string. The metering points returned will be only those that were assigned to a consumer at this time. If not provided, the current time is used.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConsumptionMeteringPoint"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:consumers"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/generation-meters/files/upload": {
+      "post": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Upload ESNA generation file",
+        "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA generation data for one or more metering points.\n\nPlease ensure that your file has the following columns:\n\n| column name | format | description |\n| --- | --- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `solar_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`.|\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) generated through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty.|\n| adjusted_quantity (optional) | float | The adjusted quantity of energy (in kWh) generated through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.**|\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related generation data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
+        "operationId": "uploadESNAGenerationFile",
+        "parameters": [
+          {
+            "name": "settlement_date",
+            "in": "query",
+            "description": "Settlement date for the ESNA data upload.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
           },
           {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+            "name": "settlement_run",
+            "in": "query",
+            "description": "Settlement run type for the ESNA data upload.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["SF", "R1", "R2", "R3", "DF"]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadId"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Generic429"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:production-file"
             ]
+          }
+        ]
+      }
+    },
+    "/esna/generation-meters/files/{file_id}": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Check ESNA generation file upload status",
+        "description": "This endpoint allows you to check the processing status of an uploaded ESNA generation file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
+        "operationId": "getESNAGenerationFile",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "description": "Identifier for the ESNA file upload, returned from the _upload file_ `POST` endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationFileUpload"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:production-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/consumption-meters/files/upload": {
+      "post": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Upload ESNA consumption file",
+        "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA consumption data for one or more metering points.\n\nPlease ensure that your file has the following columns:\n\n| column name | format | description |\n| --- | --- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `building_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`.|\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) consumed through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty.|\n| adjusted_quantity (optional) | float | The adjusted quantity of energy (in kWh) consumed through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.**|\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related consumption data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
+        "operationId": "uploadESNAConsumptionFile",
+        "parameters": [
+          {
+            "name": "settlement_date",
+            "in": "query",
+            "description": "Settlement date for the ESNA data upload.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
           },
           {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+            "name": "settlement_run",
+            "in": "query",
+            "description": "Settlement run type for the ESNA data upload.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["SF", "R1", "R2", "R3", "DF"]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadId"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Generic429"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:consumption-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/consumption-meters/files/{file_id}": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Check ESNA consumption file upload status",
+        "description": "This endpoint allows you to check the processing status of an uploaded ESNA consumption file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
+        "operationId": "getESNAConsumptionFile",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "description": "Identifier for the ESNA file upload, returned from the _upload file_ `POST` endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsumptionFileUpload"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:consumption-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/expected-upload-calendar": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Get ESNA expected upload calendar",
+        "description": "Returns ESNA expected upload calendar entries with upload deadlines and status information. The calendar tracks when generation and consumption data files should be uploaded for each settlement date and run.\n\nResults are ordered by settlement_date descending, settlement_run descending.",
+        "operationId": "getESNAExpectedUploadCalendar",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "Optional start date filter (YYYY-MM-DD format). Only entries with settlement_date on or after this date will be returned.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "Optional end date filter (YYYY-MM-DD format). Only entries with settlement_date on or before this date will be returned.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results to return (between 1 and 1000)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of results to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAExpectedUploadCalendarListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna-calendar"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/expected-upload-calendar/{upload_id}": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Get specific ESNA expected upload calendar entry",
+        "description": "Returns a specific ESNA expected upload calendar entry by ID with complete status transition history. Use this endpoint to track the detailed progress of a particular settlement date and run through the upload and validation workflow.",
+        "operationId": "getESNAExpectedUploadCalendarById",
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "path",
+            "description": "UUID of the expected upload calendar entry",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAExpectedUploadCalendar"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Expected upload calendar entry not found"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna-calendar"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna-contracts": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "List ESNA LES contracts",
+        "description": "List all ESNA LES (Local Energy System) contracts in your organization.",
+        "operationId": "listESNAContracts",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by contract status",
+            "schema": {
+              "type": "string",
+              "enum": ["ACTIVE", "INACTIVE", "DRAFT"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of contracts to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "Number of contracts to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAContractListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna-contracts"
             ]
           }
         ]
       },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
+      "post": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Create ESNA LES contract",
+        "description": "Create a new ESNA LES (Local Energy System) contract.",
+        "operationId": "createESNAContract",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ESNAContractCreateRequest"
+              }
+            }
           },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAContractResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
           {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+            "bearer-token": [
+              "write:esna-contracts"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+    },
+    "/esna-contracts/les-mpans": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Get LES contract MPANs",
+        "description": "Get ESNA LES contract MPANs (Metering Point Administration Numbers) filtered by date range. This endpoint returns a flat list of metering points with denormalized contract and membership information, useful for querying which metering points are active in contracts during a specific time period.",
+        "operationId": "getESNAContractMPANs",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "Optional start date filter (YYYY-MM-DD format). Filters contract memberships based on their start and end date.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "Optional end date filter (YYYY-MM-DD format). Filters contracts based on their date range.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNALESContractMPANListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
         },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna-contracts"
+            ]
+          }
+        ]
       }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+    },
+    "/esna-contracts/{contract_id}": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Get ESNA LES contract",
+        "description": "Get a specific ESNA LES contract by ID.",
+        "operationId": "getESNAContract",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAContractResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contract not found"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna-contracts"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Update ESNA LES contract",
+        "description": "Update an existing ESNA LES contract.",
+        "operationId": "updateESNAContract",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ESNAContractUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAContractResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contract not found"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:esna-contracts"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Delete ESNA LES contract",
+        "description": "Delete an ESNA LES contract.",
+        "operationId": "deleteESNAContract",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Contract deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contract not found"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:esna-contracts"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna-contracts/{contract_id}/memberships": {
+      "post": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Add contract membership",
+        "description": "Add a metering point membership to an ESNA LES contract.",
+        "operationId": "addESNAContractMembership",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ESNAContractMembershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAContractMembershipResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:esna-contracts"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna-contracts/{contract_id}/membership/{membership_id}": {
+      "patch": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Update contract membership",
+        "description": "Update an existing ESNA LES contract membership. Only the start_date and end_date can be modified. To change which asset or counterparty the membership refers to, you must delete and recreate the membership.",
+        "operationId": "updateESNAContractMembership",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "membership_id",
+            "in": "path",
+            "description": "Unique identifier for the membership",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ESNAContractMembershipUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ESNAContractMembershipResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contract or membership not found"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:esna-contracts"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Delete contract membership",
+        "description": "Delete an ESNA LES contract membership.",
+        "operationId": "deleteESNAContractMembership",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "membership_id",
+            "in": "path",
+            "description": "Unique identifier for the membership",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Membership deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contract or membership not found"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:esna-contracts"
+            ]
+          }
+        ]
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "info"
+        ],
+        "summary": "API information",
+        "operationId": "root",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RootInfo"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:devices"
+            ]
+          }
+        ]
+      }
     }
   },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+  "components": {
+    "schemas": {
+      "FileUploadId": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the uploaded file. Use this to query the `GET` endpoint for info on file processing status.",
+            "format": "uuid",
+            "example": "c757f0ec-13e2-4e68-a247-c6c3ad926d14"
+          }
+        }
+      },
+      "FileUploadError": {
+        "required": [
+          "errorCode",
+          "lineNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "errorCode": {
+            "type": "string",
+            "description": "Type of error, split into file errors (causing validation to fail early) and data errors.\n\nFile errors include:\n- `EMPTY_FILE`: File contains nothing at all.\n- `UNPARSEABLE_FILE`: File cannot be parsed as comma-separated values with UTF-8 encoding.\n- `TOO_MANY_COLUMNS`: More columns are present in the header row than required.\n- `MISSING_COLUMN_HEADERS`: Fewer columns are present in the header row than required.\n- `UNRECOGNISED_COLUMN_HEADERS`: Column names in the header row cannot be matched to the required columns.\n- `DUPLICATE_COLUMN_HEADERS`: Multiple column names or aliases in the header row resolve to the same required column.\n- `NOT_ENOUGH_DATA`: File contains less than the minimum number of required measurements. This is 1 if the optional `duration` parameter has been provided, or 2 if not. The granularity is inferred from the first two rows unless provided explicitly.\n- `PAYLOAD_TOO_LARGE`: File includes over 1 million measurements.\n\nData errors include:\n- `INVALID_STEP`: Invalid time difference, or different metering points, across the first two rows of data. We currently support time steps of 5/15/30/60 minutes, 1 day or 1 month. This only applies if the optional `duration` parameter is not provided.\n- `DUPLICATE_MEASUREMENT`: There is more than one measurement in the file with this metering point and timestamp.\n- `MISSING_REQUIRED_VALUE`: No value has been provided in a column where values are required.\n- `UNKNOWN_REFERENCE`: No match has been found for this value in our database.\n- `NOT_A_NUMBER`: A number was expected but the value could not be coerced into one.\n- `NEGATIVE_QUANTITY`: Generation and consumption quantities should always be greater than or equal to zero.\n- `NUMBER_TOO_LARGE`: Number exceeds the maximum value that we can represent internally.\n- `UNPARSEABLE_DATETIME`: Timestamp does not conform to the ISO 8601 format.\n- `UNZONED_DATETIME`: Timestamp is ambiguous; an explicit UTC offset should be provided. No offset is required in the special `YYYY-MM-DD` case as this will be interpreted as midnight in your organization's time zone.\n- `UNSUPPORTED_DATETIME`: Timestamp should align with the specified or inferred measurement duration. For example, monthly measurements should align with midnight on the first day of the month.\n- `OVERLAPPING_AGGREGATE_MEASUREMENT`: Measurement overlaps with existing data from the same consumer or device, regardless of metering point. Existing data can only be overwritten if the duration of the new measurement matches the duration of the existing measurement.\n- `MEASUREMENT_CONFLICTS_WITH_EXISTING_ALLOCATIONS`: Incoming generation measurement would cause a reduction in allocated supply.\n- `NO_VALID_METERING_POINT_STATE_FOUND`: Metering point could not be matched to a consumer at the given timestamp.\n- `AMBIGUOUS_METERING_POINT_STATES`: Metering point could be matched to several possible consumers but should only refer to one, most likely due to a change in metering point ownership during the measurement period.\n- `INTERNAL_ERROR`: Something went wrong on our end. Please contact support if the problem persists."
+          },
+          "lineNumber": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Line where the error was found in the file. Line 1 is the header row and Line 2 is the first data row."
+          },
+          "columnNumber": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Column where the error was found in the file. This is the (1-indexed) CSV column number, not a character number."
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "Information about how to resolve the issue."
+          }
+        },
+        "description": "Details of a file validation error."
+      },
+      "BaseFileUploadReport": {
+        "required": [
+          "periodEnd",
+          "periodStart",
+          "totalEnergyQuantity"
+        ],
+        "type": "object",
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Earliest timestamp in the file."
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Latest timestamp in the file."
+          },
+          "totalEnergyQuantity": {
+            "type": "string",
+            "description": "Total energy quantity (in kWh) across all metering points in the file."
+          },
+          "countMeteringPoint": {
+            "type": "integer",
+            "description": "Number of unique metering points in the file."
+          }
+        }
+      },
+      "ConsumptionFileUploadReport": {
+        "allOf": [
+          { "$ref": "#/components/schemas/BaseFileUploadReport" },
+          {
+            "type": "object",
+            "properties": {
+              "orphanedMeasurements": {
+                "type": "object",
+                "nullable": true,
+                "description": "Description of any orphaned measurements in the upload (measurements for metering points without known state).",
+                "properties": {
+                  "measurementCount": {
+                    "type": "integer"
+                  },
+                  "meteringPointCount": {
+                    "type": "integer"
+                  },
+                  "exampleMeteringPoints": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Inexhaustive list of metering points with orphaned measurements."
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "description": "Summary of the uploaded data, shown only if the file has passed validation."
+      },
+      "GenerationFileUploadReport": {
+        "allOf": [
+          { "$ref": "#/components/schemas/BaseFileUploadReport" }
+        ],
+        "description": "Summary of the uploaded data, shown only if the file has passed validation."
+      },
+      "BaseFileUpload": {
+        "required": [
+          "id",
+          "filename",
+          "uploadedAt",
+          "status",
+          "isProcessingFinished"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the uploaded file, returned in the `POST` response.",
+            "format": "uuid",
+            "example": "c757f0ec-13e2-4e68-a247-c6c3ad926d14"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Name of the uploaded file."
+          },
+          "uploadedAt": {
+            "type": "string",
+            "description": "Datetime of the file upload.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "description": "Current status of the file upload:\n- `UPLOADED`: File has been received by Granular.\n- `STORED`: File has been stored ready for processing.\n- `QUEUED`: File is in the queue awaiting processing.\n- `PROCESSING`: File data is undergoing validation.\n- `NOT_COMPLIANT`: File has failed validation and data has not been saved in the platform. Issues will be detailed in the `errors` field.\n- `SUCCESSFUL`: File has passed validation and data has been saved in the platform.\n- `FAILED`: Something else went wrong during file processing. Please try again later or contact support if the problem persists.\n\nThis list may change in future so please use the `isProcessingFinished` and `isProcessingSuccessful` flags in your application control flow.",
+            "enum": [
+              "UPLOADED",
+              "STORED",
+              "QUEUED",
+              "PROCESSING",
+              "NOT_COMPLIANT",
+              "SUCCESSFUL",
+              "FAILED"
+            ]
+          },
+          "isProcessingFinished": {
+            "type": "boolean",
+            "description": "Indicates if file processing is complete, whether failed or successful."
+          },
+          "isProcessingSuccessful": {
+            "type": "boolean",
+            "description": "Indicates whether file processing finished successfully. Data will be visible in the platform if true."
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 50,
+            "description": "List of file validation errors, if any. Only the first 50 will be shown.",
+            "items": {
+              "$ref": "#/components/schemas/FileUploadError"
+            }
+          }
+        }
+      },
+      "GenerationFileUpload": {
+        "allOf": [
+          { "$ref": "#/components/schemas/BaseFileUpload" },
+          {
+            "type": "object",
+            "properties": {
+              "report": {
+                "$ref": "#/components/schemas/GenerationFileUploadReport"
+              }
+            }
+          }
+        ]
+      },
+      "ConsumptionFileUpload": {
+        "allOf": [
+          { "$ref": "#/components/schemas/BaseFileUpload" },
+          {
+            "type": "object",
+            "properties": {
+              "report": {
+                "$ref": "#/components/schemas/ConsumptionFileUploadReport"
+              }
+            }
+          }
+        ]
+      },
+      "GenerationMeteringPoint": {
+        "required": [
+          "clientReference",
+          "deviceName",
+          "id",
+          "meterName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique Granular identifier for the metering point"
+          },
+          "deviceName": {
+            "type": "string",
+            "description": "Name of the device associated with the metering point"
+          },
+          "meterName": {
+            "type": "string",
+            "description": "Metering point name"
+          },
+          "clientReference": {
+            "type": "string",
+            "description": "Your unique client reference for the metering point"
+          }
+        }
+      },
+      "ConsumptionMeteringPoint": {
+        "required": [
+          "clientReference",
+          "consumerName",
+          "id",
+          "meterName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique Granular identifier for the metering point"
+          },
+          "consumerName": {
+            "type": "string",
+            "description": "Name of the consumer associated with the metering point"
+          },
+          "meterName": {
+            "type": "string",
+            "description": "Metering point name"
+          },
+          "clientReference": {
+            "type": "string",
+            "description": "Your unique client reference for the metering point"
+          }
+        }
+      },
+      "RootInfo": {
+        "required": [
+          "author",
+          "name",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          }
+        }
+      },
+      "ESNAContractListResponse": {
+        "type": "object",
+        "required": [
+          "contracts",
+          "total_count",
+          "offset",
+          "limit"
+        ],
+        "properties": {
+          "contracts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ESNAContractResponse"
+            }
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "Total number of contracts available"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Number of contracts skipped"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of contracts returned"
+          }
+        }
+      },
+      "ESNAContractResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "reference",
+          "start_date",
+          "end_date",
+          "status",
+          "created_at",
+          "modified_at",
+          "memberships"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the ESNA contract"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Contract reference identifier"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Contract start date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Contract end date"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "description": "Contract status"
+          },
+          "contract_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the associated contract file"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Contract creation timestamp"
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Contract last modification timestamp"
+          },
+          "memberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ESNAContractMembershipResponse"
+            },
+            "description": "List of metering point memberships associated with this contract"
+          }
+        }
+      },
+      "ESNAContractCreateRequest": {
+        "type": "object",
+        "required": [
+          "reference",
+          "start_date",
+          "status"
+        ],
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Contract reference identifier"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Contract start date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Contract end date"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "description": "Contract status"
+          },
+          "contract_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the associated contract file"
+          }
+        }
+      },
+      "ESNAContractUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Contract reference identifier"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Contract start date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Contract end date"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "description": "Contract status"
+          },
+          "contract_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the associated contract file"
+          }
+        }
+      },
+      "ESNAContractMembershipResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "contract_id",
+          "member_type",
+          "start_date",
+          "created_at",
+          "modified_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the membership"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the associated contract"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the asset (production/generation entity). Either asset_id OR counterparty_id will be set, never both. When set, this membership represents production capacity participating in the LES contract."
+          },
+          "counterparty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the counterparty (consumption/demand entity). Either asset_id OR counterparty_id will be set, never both. When set, this membership represents demand/consumption participating in the LES contract."
+          },
+          "asset_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name of the asset, if asset_id is set"
+          },
+          "counterparty_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name of the counterparty, if counterparty_id is set"
+          },
+          "member_type": {
+            "type": "string",
+            "enum": ["asset", "counterparty"],
+            "description": "Type of member in the contract: 'asset' for production/generation entities, 'counterparty' for consumption/demand entities"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Membership start date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Membership end date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Membership creation timestamp"
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Membership last modification timestamp"
+          }
+        }
+      },
+      "ESNAContractMembershipRequest": {
+        "type": "object",
+        "required": [
+          "start_date"
+        ],
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the asset to add to the contract. Exactly one of asset_id or counterparty_id must be provided."
+          },
+          "counterparty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the counterparty to add to the contract. Exactly one of asset_id or counterparty_id must be provided."
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Membership start date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Membership end date"
+          }
+        }
+      },
+      "ESNAContractMembershipUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Updated membership start date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Updated membership end date"
+          }
+        }
+      },
+      "ESNALESContractMPANData": {
+        "type": "object",
+        "required": [
+          "metering_point_type",
+          "contract_reference",
+          "contract_start_date",
+          "contract_status",
+          "membership_start_date"
+        ],
+        "properties": {
+          "metering_point_reference": {
+            "type": "string",
+            "nullable": true,
+            "description": "Client reference for the metering point"
+          },
+          "metering_point_type": {
+            "type": "string",
+            "enum": ["CONSUMPTION", "PRODUCTION"],
+            "description": "Type of metering point"
+          },
+          "contract_reference": {
+            "type": "string",
+            "description": "Contract reference identifier"
+          },
+          "contract_start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Contract start date"
+          },
+          "contract_end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Contract end date"
+          },
+          "contract_status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "description": "Current status of the contract"
+          },
+          "membership_start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date when the metering point membership in the contract started"
+          },
+          "membership_end_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Date when the metering point membership in the contract ended"
+          },
+          "asset_reference": {
+            "type": "string",
+            "nullable": true,
+            "description": "Client reference for the asset, if this is an asset membership"
+          },
+          "asset_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name of the asset, if this is an asset membership"
+          },
+          "counterparty_reference": {
+            "type": "string",
+            "nullable": true,
+            "description": "Client reference for the counterparty, if this is a counterparty membership"
+          },
+          "counterparty_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name of the counterparty, if this is a counterparty membership"
+          }
+        }
+      },
+      "ESNALESContractMPANListResponse": {
+        "type": "object",
+        "required": [
+          "mpans"
+        ],
+        "properties": {
+          "mpans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ESNALESContractMPANData"
+            },
+            "description": "Flat list of metering points with denormalized contract and membership information. Each entry represents a metering point associated with a contract membership, with all relevant contract and member details included."
+          }
+        }
+      },
+      "ESNAExpectedUploadCalendarStatusHistory": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the status history entry"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "GENERATION_RECEIVED",
+              "CONSUMPTION_RECEIVED",
+              "RECEIVED",
+              "VALIDATED",
+              "FAILED_VALIDATION",
+              "SAA_FILE_GENERATED",
+              "SAA_FILE_ENCRYPTED",
+              "SUBMITTED_TO_SAA",
+              "ACKNOWLEDGED_BY_SAA"
+            ],
+            "description": "Status of the expected upload at this point in history"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional reason for the status change"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when this status was recorded"
+          }
+        }
+      },
+      "ESNAExpectedUploadCalendar": {
+        "type": "object",
+        "required": [
+          "id",
+          "settlement_date",
+          "settlement_run",
+          "elexon_processing_date",
+          "granular_submission_due_at",
+          "supplier_submission_date_at",
+          "latest_status",
+          "latest_status_at",
+          "created_at",
+          "modified_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the expected upload calendar entry"
+          },
+          "settlement_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Settlement date for which data is expected"
+          },
+          "settlement_run": {
+            "type": "string",
+            "enum": ["II", "SF", "R1", "R2"],
+            "description": "Settlement run type (II: Interim Initial +5 days, SF: Settlement Final +17 days, R1: First Reconciliation +35 days, R2: Second Reconciliation +80 days)"
+          },
+          "elexon_processing_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date when Elexon processes this settlement data"
+          },
+          "granular_submission_due_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Deadline for Granular to submit data to SAA"
+          },
+          "supplier_submission_date_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Deadline for supplier to submit data to Granular"
+          },
+          "generation_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the uploaded generation file, if any"
+          },
+          "consumption_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the uploaded consumption file, if any"
+          },
+          "saa_allocation_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the generated SAA allocation file, if any"
+          },
+          "saa_encrypted_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of the encrypted SAA file, if any"
+          },
+          "latest_status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "GENERATION_RECEIVED",
+              "CONSUMPTION_RECEIVED",
+              "RECEIVED",
+              "VALIDATED",
+              "FAILED_VALIDATION",
+              "SAA_FILE_GENERATED",
+              "SAA_FILE_ENCRYPTED",
+              "SUBMITTED_TO_SAA",
+              "ACKNOWLEDGED_BY_SAA"
+            ],
+            "description": "Current status of the expected upload"
+          },
+          "latest_status_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the latest status change"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the calendar entry was created"
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the calendar entry was last modified"
+          },
+          "status_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ESNAExpectedUploadCalendarStatusHistory"
+            },
+            "description": "Complete history of status transitions for this entry"
+          }
+        }
+      },
+      "ESNAExpectedUploadCalendarListResponse": {
+        "type": "object",
+        "required": [
+          "calendar_entries",
+          "total_count",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "calendar_entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ESNAExpectedUploadCalendar"
+            },
+            "description": "List of expected upload calendar entries"
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "Total number of calendar entries available matching the filters"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of entries returned"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Number of entries skipped"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Generic401": {
+        "description": "You are not authenticated. Contact support to request an API key."
+      },
+      "Generic403": {
+        "description": "You are not authorized to access this resource as your API key does not have the required scopes. Contact support for more info."
+      },
+      "Generic429": {
+        "description": "You have exceeded the rate limit for this endpoint. Please wait one minute before retrying."
+      }
+    },
+    "securitySchemes": {
+      "bearer-token": {
+        "type": "apiKey",
+        "description": "A bearer token must be passed via the Authorization header. Please request one from support.",
+        "name": "Authorization",
+        "in": "header"
+      }
     }
   }
 }

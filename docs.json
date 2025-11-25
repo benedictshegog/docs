@@ -2,7 +2,6 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "Granular Energy API Documentation",
   "theme": "mint",
-  "openapi": ["openapi/data-upload.json"],
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -27,9 +26,7 @@
         "groups": [
           {
             "group": "Data Upload API",
-            "pages": [
-              "api-reference"
-            ]
+            "openapi": "openapi/data-upload.json"
           }
         ]
       }

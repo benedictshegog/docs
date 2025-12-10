@@ -1129,6 +1129,139 @@
         ]
       }
     },
+    "/esna/contracts/{contract_id}/download": {
+      "get": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Download contract PDF",
+        "description": "Download the PDF file associated with a specific ESNA LES contract. The PDF file must have been previously uploaded via the upload endpoint.",
+        "operationId": "downloadESNAContractPDF",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF file returned successfully",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contract not found or contract has no file uploaded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/contracts/{contract_id}/upload": {
+      "post": {
+        "tags": [
+          "esna"
+        ],
+        "summary": "Upload contract PDF",
+        "description": "Upload a PDF file for a specific ESNA LES contract. The file must be in PDF format and cannot exceed 10 MB in size. This will associate the uploaded PDF with the contract record.",
+        "operationId": "uploadESNAContractPDF",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "Unique identifier for the ESNA contract",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF file to upload (max 10 MB)"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "PDF uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Contract PDF uploaded successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Only PDF files are allowed"
+          },
+          "413": {
+            "description": "File size exceeds maximum allowed size of 10 MB"
+          },
+          "404": {
+            "description": "Contract not found"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:esna"
+            ]
+          }
+        ]
+      }
+    },
     "/esna/contracts/{contract_id}/memberships": {
       "post": {
         "tags": [
@@ -1703,6 +1836,11 @@
             "type": "string",
             "format": "date-time",
             "description": "Contract last modification timestamp"
+          },
+          "contract_filename": {
+            "type": "string",
+            "nullable": true,
+            "description": "Filename of the uploaded contract PDF, if any"
           },
           "memberships": {
             "type": "array",

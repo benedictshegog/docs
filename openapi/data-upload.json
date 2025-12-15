@@ -1758,28 +1758,19 @@
         "type": "object",
         "required": [
           "contracts",
-          "total_count",
-          "offset",
-          "limit"
+          "total_count"
         ],
         "properties": {
           "contracts": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ESNAContractResponse"
-            }
+            },
+            "description": "List of ESNA LES contracts for the current page"
           },
           "total_count": {
             "type": "integer",
             "description": "Total number of contracts available"
-          },
-          "offset": {
-            "type": "integer",
-            "description": "Number of contracts skipped"
-          },
-          "limit": {
-            "type": "integer",
-            "description": "Maximum number of contracts returned"
           }
         }
       },
@@ -2278,9 +2269,7 @@
         "type": "object",
         "required": [
           "calendar_entries",
-          "total_count",
-          "limit",
-          "skip"
+          "total_count"
         ],
         "properties": {
           "calendar_entries": {
@@ -2288,19 +2277,11 @@
             "items": {
               "$ref": "#/components/schemas/ESNAExpectedUploadCalendar"
             },
-            "description": "List of expected upload calendar entries"
+            "description": "List of expected upload calendar entries for the current page. Entries are ordered by settlement_date descending, settlement_run descending."
           },
           "total_count": {
             "type": "integer",
             "description": "Total number of calendar entries available matching the filters"
-          },
-          "limit": {
-            "type": "integer",
-            "description": "Maximum number of entries returned"
-          },
-          "skip": {
-            "type": "integer",
-            "description": "Number of entries skipped"
           }
         }
       },
@@ -2411,9 +2392,7 @@
         "type": "object",
         "required": [
           "allocations",
-          "total_count",
-          "limit",
-          "offset"
+          "total_count"
         ],
         "properties": {
           "allocations": {
@@ -2421,19 +2400,11 @@
             "items": {
               "$ref": "#/components/schemas/ESNAUnadjustedAllocation"
             },
-            "description": "List of unadjusted allocations"
+            "description": "List of unadjusted allocations for the current page"
           },
           "total_count": {
             "type": "integer",
             "description": "Total number of allocations available matching the filters"
-          },
-          "limit": {
-            "type": "integer",
-            "description": "Maximum number of allocations returned"
-          },
-          "offset": {
-            "type": "integer",
-            "description": "Number of allocations skipped"
           }
         }
       }

@@ -13,15 +13,31 @@
   ],
   "tags": [
     {
-      "name": "esna",
-      "description": "Endpoints relating to ESNA metering data upload and contract management"
+      "name": "portfolio",
+      "description": "Manage demand and supply portfolio data including consumers and production devices"
+    },
+    {
+      "name": "metering-data",
+      "description": "Upload and manage ESNA generation and consumption metering data files"
+    },
+    {
+      "name": "upload-calendar",
+      "description": "Track expected upload deadlines and submission status for settlement runs"
+    },
+    {
+      "name": "contracts",
+      "description": "Manage ESNA LES (Local Energy System) contracts and memberships"
+    },
+    {
+      "name": "allocations",
+      "description": "Query allocation volumes for settlement dates"
     }
   ],
   "paths": {
     "/esna/generation-measurements/files/upload": {
       "post": {
         "tags": [
-          "esna"
+          "metering-data"
         ],
         "summary": "Upload ESNA generation file",
         "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA generation data for one or more metering points.\n\n**Important:** All column headers listed below must be present in your CSV file header row. The \"(values optional)\" notation means individual cell values may be empty, not that the column header itself can be omitted.\n\nPlease ensure that your file has the following columns:\n\n| Column Name | Format | Description |\n| --- | --- | --- |\n| metering_point | string | Client reference that uniquely identifies the metering point in your organization, e.g. `solar_1`. |\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`. |\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) generated through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty. |\n| adjusted_quantity (values optional) | float | The adjusted quantity of energy (in kWh) generated through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.** This column header is required in the CSV, but individual cell values may be left empty. |\n\n**Do NOT include** `settlement_date` or `settlement_run` as columns in your CSV file. These must be provided as query parameters in the API request (see parameters below).\n\n**Example CSV format:**\n```csv\nmetering_point,period_start,unadjusted_quantity,adjusted_quantity\nSOLAR_1,2024-01-01T00:00:00+00:00,1500.5,\nSOLAR_1,2024-01-01T00:30:00+00:00,1520.0,1525.0\nSOLAR_1,2024-01-01T01:00:00+00:00,1480.3,\n```\n\nIn this example:\n- Row 1: Only `unadjusted_quantity` has a value (1500.5 kWh will be used)\n- Row 2: Both quantities provided (1525.0 kWh will be used, as `adjusted_quantity` takes priority)\n- Row 3: Only `unadjusted_quantity` has a value (1480.3 kWh will be used)\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related generation data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
@@ -106,7 +122,7 @@
     "/esna/generation-measurements/files/{file_id}": {
       "get": {
         "tags": [
-          "esna"
+          "metering-data"
         ],
         "summary": "Check ESNA generation file upload status",
         "description": "This endpoint allows you to check the processing status of an uploaded ESNA generation file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
@@ -153,7 +169,7 @@
     "/esna/consumption-measurements/files/upload": {
       "post": {
         "tags": [
-          "esna"
+          "metering-data"
         ],
         "summary": "Upload ESNA consumption file",
         "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA consumption data for one or more metering points.\n\n**Important:** All column headers listed below must be present in your CSV file header row. The \"(values optional)\" notation means individual cell values may be empty, not that the column header itself can be omitted.\n\nPlease ensure that your file has the following columns:\n\n| Column Name | format | description |\n| ------------------------------------------ | ---------------------------- | - |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `building_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`.|\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) consumed through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty.|\n| adjusted_quantity (values optional) | float | The adjusted quantity of energy (in kWh) consumed through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.** This column header is required in the CSV, but individual cell values may be left empty.|\n\n**Do NOT include** `settlement_date` or `settlement_run` as columns in your CSV file. These must be provided as query parameters in the API request (see parameters below).\n\n**Example CSV format:**\n```csv\nmetering_point,period_start,unadjusted_quantity,adjusted_quantity\nBUILDING_1,2024-01-01T00:00:00+00:00,850.2,\nBUILDING_1,2024-01-01T00:30:00+00:00,865.5,870.0\nBUILDING_1,2024-01-01T01:00:00+00:00,845.8,\n```\n\nIn this example:\n- Row 1: Only `unadjusted_quantity` has a value (850.2 kWh will be used)\n- Row 2: Both quantities provided (870.0 kWh will be used, as `adjusted_quantity` takes priority)\n- Row 3: Only `unadjusted_quantity` has a value (845.8 kWh will be used)\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related consumption data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
@@ -238,7 +254,7 @@
     "/esna/consumption-measurements/files/{file_id}": {
       "get": {
         "tags": [
-          "esna"
+          "metering-data"
         ],
         "summary": "Check ESNA consumption file upload status",
         "description": "This endpoint allows you to check the processing status of an uploaded ESNA consumption file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
@@ -285,7 +301,7 @@
     "/esna/expected-upload-calendar": {
       "get": {
         "tags": [
-          "esna"
+          "upload-calendar"
         ],
         "summary": "Get ESNA expected upload calendar",
         "description": "Returns ESNA expected upload calendar entries with upload deadlines and status information. The calendar tracks when generation and consumption data files should be uploaded for each settlement date and run.\n\nResults are ordered by settlement_date descending, settlement_run descending.",
@@ -361,7 +377,7 @@
     "/esna/expected-upload-calendar/{upload_id}": {
       "get": {
         "tags": [
-          "esna"
+          "upload-calendar"
         ],
         "summary": "Get specific ESNA expected upload calendar entry",
         "description": "Returns a specific ESNA expected upload calendar entry by ID with complete status transition history. Use this endpoint to track the detailed progress of a particular settlement date and run through the upload and validation workflow.",
@@ -411,7 +427,7 @@
     "/esna/unadjusted-allocations": {
       "get": {
         "tags": [
-          "esna"
+          "allocations"
         ],
         "summary": "Get unadjusted allocations",
         "description": "Get unadjusted allocation volumes for a specific settlement date and allocation run. Returns detailed allocation information with pagination support.",
@@ -489,7 +505,7 @@
     "/esna/contracts": {
       "get": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "List ESNA LES contracts",
         "description": "List all ESNA LES (Local Energy System) contracts in your organization.",
@@ -558,7 +574,7 @@
       },
       "post": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Create ESNA LES contract",
         "description": "Create a new ESNA LES (Local Energy System) contract.",
@@ -603,7 +619,7 @@
     "/esna/contracts/les-mpans": {
       "get": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Get LES contract MPANs",
         "description": "Get ESNA LES contract MPANs (Metering Point Administration Numbers) filtered by date range. This endpoint returns a flat list of metering points with denormalized contract and membership information, useful for querying which metering points are active in contracts during a specific time period.",
@@ -658,7 +674,7 @@
     "/esna/contracts/{contract_id}": {
       "get": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Get ESNA LES contract",
         "description": "Get a specific ESNA LES contract by ID.",
@@ -706,7 +722,7 @@
       },
       "put": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Update ESNA LES contract",
         "description": "Update an existing ESNA LES contract.",
@@ -764,7 +780,7 @@
       },
       "delete": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Delete ESNA LES contract",
         "description": "Delete an ESNA LES contract.",
@@ -820,7 +836,7 @@
     "/esna/contracts/{contract_id}/download": {
       "get": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Download contract PDF",
         "description": "Download the PDF file associated with a specific ESNA LES contract. The PDF file must have been previously uploaded via the upload endpoint.",
@@ -871,7 +887,7 @@
     "/esna/contracts/{contract_id}/upload": {
       "post": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Upload contract PDF",
         "description": "Upload a PDF file for a specific ESNA LES contract. The file must be in PDF format and cannot exceed 10 MB in size. This will associate the uploaded PDF with the contract record.",
@@ -953,7 +969,7 @@
     "/esna/contracts/{contract_id}/memberships": {
       "post": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Add contract membership",
         "description": "Add a metering point membership to an ESNA LES contract.",
@@ -1010,7 +1026,7 @@
     "/esna/contracts/{contract_id}/memberships/{membership_id}": {
       "patch": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Update contract membership",
         "description": "Update an existing ESNA LES contract membership. Only the start_date and end_date can be modified. To change which asset or counterparty the membership refers to, you must delete and recreate the membership.",
@@ -1078,7 +1094,7 @@
       },
       "delete": {
         "tags": [
-          "esna"
+          "contracts"
         ],
         "summary": "Delete contract membership",
         "description": "Delete an ESNA LES contract membership.",
@@ -1136,6 +1152,406 @@
           {
             "bearer-token": [
               "write:esna"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/demand/download": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Export demand portfolio",
+        "description": "Export the demand portfolio (consumers and metering points) as a CSV file. Optionally filter by specific metering point UUIDs.",
+        "operationId": "exportDemandPortfolio",
+        "parameters": [
+          {
+            "name": "metering_point_uuids",
+            "in": "query",
+            "description": "Optional list of metering point UUIDs to filter the export. If not provided, exports all metering points.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV file containing demand portfolio data",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:demand-portfolio-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/demand/upload": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Upload demand portfolio",
+        "description": "Upload a CSV file containing demand portfolio data (consumers and metering points). Use the schema endpoint to get the required CSV format.\n\n### File processing\nThe uploaded file is queued for processing. Use the returned `id` to check the processing status via the GET endpoint.\n\n### Rate limit\nMaximum 5 calls per minute.",
+        "operationId": "uploadDemandPortfolio",
+        "parameters": [
+          {
+            "name": "delete_allocation_volumes",
+            "in": "query",
+            "description": "If true, existing allocation volumes for affected metering points will be deleted before processing the upload.",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file_in"
+                ],
+                "type": "object",
+                "properties": {
+                  "file_in": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV file containing demand portfolio data"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Upload accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadId"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Generic429"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:demand-portfolio-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/demand/upload/{file_id}": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Check demand portfolio upload status",
+        "description": "Check the processing status of a demand portfolio file upload.\n\n- `processingFinished: true` indicates processing is complete.\n- `processingSuccessful: true` indicates the file passed validation and data was saved.\n- If validation failed, errors will be listed in the `errors` field.",
+        "operationId": "getDemandPortfolioUploadStatus",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "description": "The file upload ID returned from the upload endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemandPortfolioFileUpload"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "404": {
+            "description": "File upload not found"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:demand-portfolio-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/demand/upload/schema": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get demand portfolio CSV schema",
+        "description": "Returns the expected CSV schema for demand portfolio uploads, including required columns and their formats. Use this to validate your CSV structure before uploading.",
+        "operationId": "getDemandPortfolioSchema",
+        "responses": {
+          "200": {
+            "description": "CSV schema definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CSVSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:demand-portfolio-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/supply/download": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Export supply portfolio",
+        "description": "Export the supply portfolio (production devices and metering points) as a CSV file. Optionally filter by specific metering point UUIDs.",
+        "operationId": "exportSupplyPortfolio",
+        "parameters": [
+          {
+            "name": "metering_point_uuids",
+            "in": "query",
+            "description": "Optional list of metering point UUIDs to filter the export. If not provided, exports all metering points.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV file containing supply portfolio data",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:supply-portfolio-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/supply/upload": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Upload supply portfolio",
+        "description": "Upload a CSV file containing supply portfolio data (production devices and metering points). Use the schema endpoint to get the required CSV format.\n\n### File processing\nThe uploaded file is queued for processing. Use the returned `id` to check the processing status via the GET endpoint.\n\n### Rate limit\nMaximum 5 calls per minute.",
+        "operationId": "uploadSupplyPortfolio",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV file containing supply portfolio data"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Upload accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadId"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Generic429"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:supply-portfolio-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/supply/upload/{file_id}": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Check supply portfolio upload status",
+        "description": "Check the processing status of a supply portfolio file upload.\n\n- `processingFinished: true` indicates processing is complete.\n- `processingSuccessful: true` indicates the file passed validation and data was saved.\n- If validation failed, errors will be listed in the `errors` field.",
+        "operationId": "getSupplyPortfolioUploadStatus",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "description": "The file upload ID returned from the upload endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplyPortfolioFileUpload"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "404": {
+            "description": "File upload not found"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:supply-portfolio-file"
+            ]
+          }
+        ]
+      }
+    },
+    "/portfolio/supply/upload/schema": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get supply portfolio CSV schema",
+        "description": "Returns the expected CSV schema for supply portfolio uploads, including required columns and their formats. Use this to validate your CSV structure before uploading.",
+        "operationId": "getSupplyPortfolioSchema",
+        "responses": {
+          "200": {
+            "description": "CSV schema definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CSVSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:supply-portfolio-file"
             ]
           }
         ]
@@ -2096,6 +2512,201 @@
           "total_count": {
             "type": "integer",
             "description": "Total number of allocations available matching the filters"
+          }
+        }
+      },
+      "DemandPortfolioFileUploadReport": {
+        "type": "object",
+        "properties": {
+          "createdConsumerCount": {
+            "type": "integer",
+            "description": "Number of consumers created from the upload"
+          },
+          "createdMeteringPointCount": {
+            "type": "integer",
+            "description": "Number of metering points created from the upload"
+          },
+          "orphanedMeasurements": {
+            "type": "object",
+            "nullable": true,
+            "description": "Details of any orphaned measurements (measurements for metering points without known state)",
+            "properties": {
+              "measurementCount": {
+                "type": "integer"
+              },
+              "meteringPointCount": {
+                "type": "integer"
+              },
+              "exampleMeteringPoints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "DemandPortfolioFileUpload": {
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "uploadedAt",
+          "status",
+          "processingFinished"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the uploaded file"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Name of the uploaded file"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the file was uploaded"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UPLOADED",
+              "STORED",
+              "QUEUED",
+              "PROCESSING",
+              "NOT_COMPLIANT",
+              "SUCCESSFUL",
+              "FAILED"
+            ],
+            "description": "Current processing status of the file"
+          },
+          "processingFinished": {
+            "type": "boolean",
+            "description": "Whether file processing is complete"
+          },
+          "processingSuccessful": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether processing completed successfully. Null if processing is not finished."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileUploadError"
+            },
+            "description": "List of validation errors, if any"
+          },
+          "report": {
+            "$ref": "#/components/schemas/DemandPortfolioFileUploadReport"
+          }
+        }
+      },
+      "SupplyPortfolioFileUploadReport": {
+        "type": "object",
+        "properties": {
+          "productionDevicesRegisteredCount": {
+            "type": "integer",
+            "description": "Number of new production devices registered"
+          },
+          "productionDevicesUpdatedCount": {
+            "type": "integer",
+            "description": "Number of existing production devices updated"
+          },
+          "meteringPointsCreatedCount": {
+            "type": "integer",
+            "description": "Number of new metering points created"
+          }
+        }
+      },
+      "SupplyPortfolioFileUpload": {
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "uploadedAt",
+          "status",
+          "processingFinished"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the uploaded file"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Name of the uploaded file"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the file was uploaded"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UPLOADED",
+              "STORED",
+              "QUEUED",
+              "PROCESSING",
+              "NOT_COMPLIANT",
+              "SUCCESSFUL",
+              "FAILED"
+            ],
+            "description": "Current processing status of the file"
+          },
+          "processingFinished": {
+            "type": "boolean",
+            "description": "Whether file processing is complete"
+          },
+          "processingSuccessful": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether processing completed successfully. Null if processing is not finished."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileUploadError"
+            },
+            "description": "List of validation errors, if any"
+          },
+          "report": {
+            "$ref": "#/components/schemas/SupplyPortfolioFileUploadReport"
+          }
+        }
+      },
+      "CSVSchema": {
+        "type": "object",
+        "description": "Schema definition for CSV file uploads, describing expected columns and their formats",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column header name"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Expected data type (e.g., string, integer, date)"
+                },
+                "required": {
+                  "type": "boolean",
+                  "description": "Whether the column is required"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Description of the column's purpose"
+                }
+              }
+            }
           }
         }
       }

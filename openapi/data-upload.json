@@ -13,346 +13,18 @@
   ],
   "tags": [
     {
-      "name": "generation",
-      "description": "Endpoints relating to generation data upload"
-    },
-    {
-      "name": "consumption",
-      "description": "Endpoints relating to consumption data upload"
-    },
-    {
       "name": "esna",
       "description": "Endpoints relating to ESNA metering data upload and contract management"
     }
   ],
   "paths": {
-    "/generation-meters/files/upload": {
-      "post": {
-        "tags": [
-          "generation"
-        ],
-        "summary": "Upload file",
-        "description": "### File requirements\nUsing this route you can upload a CSV file of generation data for one or more metering points.\n\nPlease ensure that your file has the following columns:\n\n| column name | format | description |\n| --- | --- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `solar_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`. A date in `YYYY-MM-DD` format will be accepted as midnight in your organization's time zone.|\n| quantity | float | The quantity of energy (in kWh) generated through this metering point over this time step.|\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. If the optional `duration` query parameter is omitted then your file must begin with 2 measurements from the same metering point; The measurement duration for the file will be inferred from the interval between the `period_start` values of these first two measurements. If possible, please ensure that each payload contains all the data for the time period covered by the payload.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
-        "operationId": "uploadGenerationFile",
-        "parameters": [
-          {
-            "name": "duration",
-            "in": "query",
-            "description": "Optional duration of each measurement as an ISO8601 duration string. Must be one of `PT5M`, `PT15M`, `PT30M`, `PT1H`, `P1D` or `P1M`. If omitted, the duration will be inferred from the interval between `period_start` in the first two rows of the uploaded CSV, provided they represent the same `metering_point`.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "required": [
-                  "file"
-                ],
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileUploadId"
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
-          },
-          "429": {
-            "$ref": "#/components/responses/Generic429"
-          }
-        },
-        "security": [
-          {
-            "bearer-token": [
-              "write:production-file"
-            ]
-          }
-        ]
-      }
-    },
-    "/consumption-meters/files/upload": {
-      "post": {
-        "tags": [
-          "consumption"
-        ],
-        "summary": "Upload file",
-        "description": "### File requirements\nUsing this route you can upload a CSV file of consumption data for one or more metering points.\n\nPlease ensure that your file has the following columns:\n\n| column name | format | description |\n| --- | --- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `building_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`. A date in `YYYY-MM-DD` format will be accepted as midnight in your organization's time zone.|\n| quantity | float | The quantity of energy (in kWh) consumed through this metering point over this time step.|\n|consumer (optional)|string|Optional disambiguating consumer information. See \"Disambiguation\" section below.|\n|&lt;tags> (optional)|string|Optional disambiguating tag information. See \"Disambiguation\" section below.|\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. If the optional `duration` query parameter is omitted then your file must begin with 2 measurements from the same metering point; The measurement duration for the file will be inferred from the interval between the `period_start` values of these first two measurements. If possible, please ensure that each payload contains all the data for the time period covered by the payload.\n### Disambiguation\nWhen uploading measurements with a monthly interval, it is possible for a metering point to change \"state\" (meaning its consumer and/or a tag value changes) midway through the measurement interval. To determine which state to assign the measurement to, you will need to add one or more \"disambiguation\" columns.\n\nThese can each be any tag key, or `consumer` (for the consumer reference). You only need to supply values for measurements that span a state change, though there is no harm in providing them on other rows. Any blank values will be ignored.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
-        "operationId": "uploadConsumptionFile",
-        "parameters": [
-          {
-            "name": "duration",
-            "in": "query",
-            "description": "Optional duration of each measurement as an ISO8601 duration string. Must be one of `PT5M`, `PT15M`, `PT30M`, `PT1H`, `P1D` or `P1M`. If omitted, the duration will be inferred from the interval between `period_start` in the first two rows of the uploaded CSV, provided they represent the same `metering_point`.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "create_unknown_metering_points",
-            "in": "query",
-            "description": "Create any unknown metering points present in the uploaded CSV. These metering points will be created without any association to a couterparty or tags. The corresponding measurements will be ingested but they will not create any demand in the platform until the demand portfolio is updated for these metering points. Possible values to enable metering point creation are `1`, `yes` or `true`. Default is disabled.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "required": [
-                  "file"
-                ],
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileUploadId"
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
-          },
-          "429": {
-            "$ref": "#/components/responses/Generic429"
-          }
-        },
-        "security": [
-          {
-            "bearer-token": [
-              "write:consumption-file"
-            ]
-          }
-        ]
-      }
-    },
-    "/generation-meters/files/{id}": {
-      "get": {
-        "tags": [
-          "generation"
-        ],
-        "summary": "Check file upload status",
-        "description": "This endpoint allows you to check the processing status of an uploaded file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
-        "operationId": "getGenerationFile",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Identifier for the file upload, returned from the _upload file_ `POST` endpoint.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenerationFileUpload"
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
-          }
-        },
-        "security": [
-          {
-            "bearer-token": [
-              "read:production-file"
-            ]
-          }
-        ]
-      }
-    },
-    "/generation-meters/": {
-      "get": {
-        "tags": [
-          "generation"
-        ],
-        "summary": "List metering points",
-        "description": "List all generation metering points in your organization.",
-        "operationId": "listGenerationMeteringPoints",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/GenerationMeteringPoint"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
-          }
-        },
-        "security": [
-          {
-            "bearer-token": [
-              "read:devices"
-            ]
-          }
-        ]
-      }
-    },
-    "/consumption-meters/files/{id}": {
-      "get": {
-        "tags": [
-          "consumption"
-        ],
-        "summary": "Check file upload status",
-        "description": "This endpoint allows you to check the processing status of an uploaded file:\n\n- File processing is complete if `isProcessingFinished` is `true`.\n- If the file has failed validation, `isProcessingSuccessful` will be `false` and issues will be listed in the `errors` field.\n- If the file has passed validation, `isProcessingSuccessful` will be `true` and the data will be ready to view in the platform.\n",
-        "operationId": "getConsumptionFile",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Identifier for the file upload, returned from the _upload file_ `POST` endpoint.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConsumptionFileUpload"
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
-          }
-        },
-        "security": [
-          {
-            "bearer-token": [
-              "read:consumption-file"
-            ]
-          }
-        ]
-      }
-    },
-    "/consumption-meters/": {
-      "get": {
-        "tags": [
-          "consumption"
-        ],
-        "summary": "List metering points",
-        "description": "List all consumption metering points in your organization.",
-        "operationId": "listConsumptionMeteringPoints",
-        "parameters": [
-          {
-            "name": "at_datetime",
-            "in": "query",
-            "description": "Optional ISO-8601 datetime string. The metering points returned will be only those that were assigned to a consumer at this time. If not provided, the current time is used.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ConsumptionMeteringPoint"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
-          }
-        },
-        "security": [
-          {
-            "bearer-token": [
-              "read:consumers"
-            ]
-          }
-        ]
-      }
-    },
     "/esna/generation-measurements/files/upload": {
       "post": {
         "tags": [
           "esna"
         ],
         "summary": "Upload ESNA generation file",
-        "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA generation data for one or more metering points.\n\n**Important:** All column headers listed below must be present in your CSV file header row. The \"(values optional)\" notation means individual cell values may be empty, not that the column header itself can be omitted.\n\nPlease ensure that your file has the following columns:\n\n| column name (all required in header) | format | description |\n| ------------------------------ | ---------------------------- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `solar_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`.|\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) generated through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty.|\n| adjusted_quantity (values optional) | float | The adjusted quantity of energy (in kWh) generated through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.** This column header is required in the CSV, but individual cell values may be left empty.|\n\n**Do NOT include** `settlement_date` or `settlement_run` as columns in your CSV file. These must be provided as query parameters in the API request (see parameters below).\n\n**Example CSV format:**\n```csv\nmetering_point,period_start,unadjusted_quantity,adjusted_quantity\nSOLAR_1,2024-01-01T00:00:00+00:00,1500.5,\nSOLAR_1,2024-01-01T00:30:00+00:00,1520.0,1525.0\nSOLAR_1,2024-01-01T01:00:00+00:00,1480.3,\n```\n\nIn this example:\n- Row 1: Only `unadjusted_quantity` has a value (1500.5 kWh will be used)\n- Row 2: Both quantities provided (1525.0 kWh will be used, as `adjusted_quantity` takes priority)\n- Row 3: Only `unadjusted_quantity` has a value (1480.3 kWh will be used)\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related generation data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
+        "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA generation data for one or more metering points.\n\n**Important:** All column headers listed below must be present in your CSV file header row. The \"(values optional)\" notation means individual cell values may be empty, not that the column header itself can be omitted.\n\nPlease ensure that your file has the following columns:\n\n| Column Name | Format | Description |\n| --- | --- | --- |\n| metering_point | string | Client reference that uniquely identifies the metering point in your organization, e.g. `solar_1`. |\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`. |\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) generated through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty. |\n| adjusted_quantity (values optional) | float | The adjusted quantity of energy (in kWh) generated through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.** This column header is required in the CSV, but individual cell values may be left empty. |\n\n**Do NOT include** `settlement_date` or `settlement_run` as columns in your CSV file. These must be provided as query parameters in the API request (see parameters below).\n\n**Example CSV format:**\n```csv\nmetering_point,period_start,unadjusted_quantity,adjusted_quantity\nSOLAR_1,2024-01-01T00:00:00+00:00,1500.5,\nSOLAR_1,2024-01-01T00:30:00+00:00,1520.0,1525.0\nSOLAR_1,2024-01-01T01:00:00+00:00,1480.3,\n```\n\nIn this example:\n- Row 1: Only `unadjusted_quantity` has a value (1500.5 kWh will be used)\n- Row 2: Both quantities provided (1525.0 kWh will be used, as `adjusted_quantity` takes priority)\n- Row 3: Only `unadjusted_quantity` has a value (1480.3 kWh will be used)\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related generation data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
         "operationId": "uploadESNAGenerationFile",
         "parameters": [
           {
@@ -372,7 +44,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["SF", "R1", "R2", "R3", "DF"]
+              "enum": [
+                "SF",
+                "R1",
+                "R2",
+                "R3",
+                "DF"
+              ]
             }
           }
         ],
@@ -406,11 +84,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           },
           "429": {
             "$ref": "#/components/responses/Generic429"
@@ -456,11 +134,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -478,7 +156,7 @@
           "esna"
         ],
         "summary": "Upload ESNA consumption file",
-        "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA consumption data for one or more metering points.\n\n**Important:** All column headers listed below must be present in your CSV file header row. The \"(values optional)\" notation means individual cell values may be empty, not that the column header itself can be omitted.\n\nPlease ensure that your file has the following columns:\n\n| column name (all required in header) | format | description |\n| ------------------------------ | ---------------------------- | --- |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `building_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`.|\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) consumed through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty.|\n| adjusted_quantity (values optional) | float | The adjusted quantity of energy (in kWh) consumed through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.** This column header is required in the CSV, but individual cell values may be left empty.|\n\n**Do NOT include** `settlement_date` or `settlement_run` as columns in your CSV file. These must be provided as query parameters in the API request (see parameters below).\n\n**Example CSV format:**\n```csv\nmetering_point,period_start,unadjusted_quantity,adjusted_quantity\nBUILDING_1,2024-01-01T00:00:00+00:00,850.2,\nBUILDING_1,2024-01-01T00:30:00+00:00,865.5,870.0\nBUILDING_1,2024-01-01T01:00:00+00:00,845.8,\n```\n\nIn this example:\n- Row 1: Only `unadjusted_quantity` has a value (850.2 kWh will be used)\n- Row 2: Both quantities provided (870.0 kWh will be used, as `adjusted_quantity` takes priority)\n- Row 3: Only `unadjusted_quantity` has a value (845.8 kWh will be used)\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related consumption data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
+        "description": "### File requirements\nUsing this route you can upload a CSV file of ESNA consumption data for one or more metering points.\n\n**Important:** All column headers listed below must be present in your CSV file header row. The \"(values optional)\" notation means individual cell values may be empty, not that the column header itself can be omitted.\n\nPlease ensure that your file has the following columns:\n\n| Column Name | format | description |\n| ------------------------------------------ | ---------------------------- | - |\n| metering_point | string️ | Client reference that uniquely identifies the metering point in your organization, e.g. `building_1`.|\n| period_start | ISO 8601 datetime with UTC offset | Timestamp corresponding to the start time of the measurement step, e.g. `2022-09-30T05:00:00+02:00`.|\n| unadjusted_quantity | float | The unadjusted quantity of energy (in kWh) consumed through this metering point over this time step. Used when `adjusted_quantity` is not provided or is empty.|\n| adjusted_quantity (values optional) | float | The adjusted quantity of energy (in kWh) consumed through this metering point over this time step. **When provided and non-empty, this value takes priority over `unadjusted_quantity`.** This column header is required in the CSV, but individual cell values may be left empty.|\n\n**Do NOT include** `settlement_date` or `settlement_run` as columns in your CSV file. These must be provided as query parameters in the API request (see parameters below).\n\n**Example CSV format:**\n```csv\nmetering_point,period_start,unadjusted_quantity,adjusted_quantity\nBUILDING_1,2024-01-01T00:00:00+00:00,850.2,\nBUILDING_1,2024-01-01T00:30:00+00:00,865.5,870.0\nBUILDING_1,2024-01-01T01:00:00+00:00,845.8,\n```\n\nIn this example:\n- Row 1: Only `unadjusted_quantity` has a value (850.2 kWh will be used)\n- Row 2: Both quantities provided (870.0 kWh will be used, as `adjusted_quantity` takes priority)\n- Row 3: Only `unadjusted_quantity` has a value (845.8 kWh will be used)\n\n**Quantity prioritization:** If both `unadjusted_quantity` and `adjusted_quantity` are present in a row, the system uses `adjusted_quantity` if it has a value, otherwise it falls back to `unadjusted_quantity`. At least one of these columns must contain a value for each measurement.\n\nYour file must be under 200MB and contain **no more than 1 million** measurements. This endpoint is specifically for ESNA (Exempt Supplier Notification Agent) related consumption data uploads.\n### File processing\nWe store your uploaded file then add it to a queue to be processed. The data will be validated and, if successful, saved in the platform. Using the `id` provided in this `POST` response, you can refer to the `GET` endpoint to check the status of this processing.\n\n### Rate limit\nThe maximum number of calls per minute is 5. Subsequent calls are subject to an HTTP status code of 429 (too many requests) and exceptionally may receive a 504 status code (gateway timeout). In addition, an API request may also be rejected with this status code if there is heavy usage of the API by other clients.\n\nIn the event of being rate limited, clients should sleep for at least 60 seconds before re-trying this `POST` request.",
         "operationId": "uploadESNAConsumptionFile",
         "parameters": [
           {
@@ -498,7 +176,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["SF", "R1", "R2", "R3", "DF"]
+              "enum": [
+                "SF",
+                "R1",
+                "R2",
+                "R3",
+                "DF"
+              ]
             }
           }
         ],
@@ -532,11 +216,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           },
           "429": {
             "$ref": "#/components/responses/Generic429"
@@ -582,11 +266,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -658,11 +342,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -705,14 +389,14 @@
               }
             }
           },
-          "404": {
-            "description": "Expected upload calendar entry not found"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Expected upload calendar entry not found"
           }
         },
         "security": [
@@ -786,11 +470,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -817,7 +501,11 @@
             "description": "Filter by contract status",
             "schema": {
               "type": "string",
-              "enum": ["ACTIVE", "INACTIVE", "DRAFT"]
+              "enum": [
+                "ACTIVE",
+                "INACTIVE",
+                "DRAFT"
+              ]
             }
           },
           {
@@ -853,11 +541,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -896,11 +584,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -951,11 +639,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -998,14 +686,14 @@
               }
             }
           },
-          "404": {
-            "description": "Contract not found"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Contract not found"
           }
         },
         "security": [
@@ -1056,14 +744,14 @@
               }
             }
           },
-          "404": {
-            "description": "Contract not found"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Contract not found"
           }
         },
         "security": [
@@ -1110,14 +798,14 @@
               }
             }
           },
-          "404": {
-            "description": "Contract not found"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Contract not found"
           }
         },
         "security": [
@@ -1161,14 +849,14 @@
               }
             }
           },
-          "404": {
-            "description": "Contract not found or contract has no file uploaded"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Contract not found or contract has no file uploaded"
           }
         },
         "security": [
@@ -1240,17 +928,17 @@
           "400": {
             "description": "Only PDF files are allowed"
           },
-          "413": {
-            "description": "File size exceeds maximum allowed size of 10 MB"
-          },
-          "404": {
-            "description": "Contract not found"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Contract not found"
+          },
+          "413": {
+            "description": "File size exceeds maximum allowed size of 10 MB"
           }
         },
         "security": [
@@ -1303,11 +991,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
           "401": {
             "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
           }
         },
         "security": [
@@ -1370,14 +1058,14 @@
               }
             }
           },
-          "404": {
-            "description": "Contract or membership not found"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Contract or membership not found"
           }
         },
         "security": [
@@ -1434,54 +1122,20 @@
               }
             }
           },
-          "404": {
-            "description": "Contract or membership not found"
+          "401": {
+            "$ref": "#/components/responses/Generic401"
           },
           "403": {
             "$ref": "#/components/responses/Generic403"
           },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
+          "404": {
+            "description": "Contract or membership not found"
           }
         },
         "security": [
           {
             "bearer-token": [
               "write:esna"
-            ]
-          }
-        ]
-      }
-    },
-    "/": {
-      "get": {
-        "tags": [
-          "info"
-        ],
-        "summary": "API information",
-        "operationId": "root",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RootInfo"
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/components/responses/Generic403"
-          },
-          "401": {
-            "$ref": "#/components/responses/Generic401"
-          }
-        },
-        "security": [
-          {
-            "bearer-token": [
-              "read:devices"
             ]
           }
         ]
@@ -1562,7 +1216,9 @@
       },
       "ConsumptionFileUploadReport": {
         "allOf": [
-          { "$ref": "#/components/schemas/BaseFileUploadReport" },
+          {
+            "$ref": "#/components/schemas/BaseFileUploadReport"
+          },
           {
             "type": "object",
             "properties": {
@@ -1593,7 +1249,9 @@
       },
       "GenerationFileUploadReport": {
         "allOf": [
-          { "$ref": "#/components/schemas/BaseFileUploadReport" }
+          {
+            "$ref": "#/components/schemas/BaseFileUploadReport"
+          }
         ],
         "description": "Summary of the uploaded data, shown only if the file has passed validation."
       },
@@ -1655,7 +1313,9 @@
       },
       "GenerationFileUpload": {
         "allOf": [
-          { "$ref": "#/components/schemas/BaseFileUpload" },
+          {
+            "$ref": "#/components/schemas/BaseFileUpload"
+          },
           {
             "type": "object",
             "properties": {
@@ -1668,7 +1328,9 @@
       },
       "ConsumptionFileUpload": {
         "allOf": [
-          { "$ref": "#/components/schemas/BaseFileUpload" },
+          {
+            "$ref": "#/components/schemas/BaseFileUpload"
+          },
           {
             "type": "object",
             "properties": {
@@ -1809,7 +1471,11 @@
           },
           "status": {
             "type": "string",
-            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "DRAFT"
+            ],
             "description": "Contract status"
           },
           "contract_file_id": {
@@ -1867,7 +1533,11 @@
           },
           "status": {
             "type": "string",
-            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "DRAFT"
+            ],
             "description": "Contract status"
           },
           "contract_file_id": {
@@ -1898,7 +1568,11 @@
           },
           "status": {
             "type": "string",
-            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "DRAFT"
+            ],
             "description": "Contract status"
           },
           "contract_file_id": {
@@ -1954,7 +1628,10 @@
           },
           "member_type": {
             "type": "string",
-            "enum": ["asset", "counterparty"],
+            "enum": [
+              "asset",
+              "counterparty"
+            ],
             "description": "Type of member in the contract: 'asset' for production/generation entities, 'counterparty' for consumption/demand entities"
           },
           "start_date": {
@@ -2044,7 +1721,10 @@
           },
           "metering_point_type": {
             "type": "string",
-            "enum": ["CONSUMPTION", "PRODUCTION"],
+            "enum": [
+              "CONSUMPTION",
+              "PRODUCTION"
+            ],
             "description": "Type of metering point"
           },
           "contract_reference": {
@@ -2064,7 +1744,11 @@
           },
           "contract_status": {
             "type": "string",
-            "enum": ["ACTIVE", "INACTIVE", "DRAFT"],
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "DRAFT"
+            ],
             "description": "Current status of the contract"
           },
           "membership_start_date": {
@@ -2183,7 +1867,14 @@
           },
           "settlement_run": {
             "type": "string",
-            "enum": ["II", "SF", "R1", "R2", "R3", "DF"],
+            "enum": [
+              "II",
+              "SF",
+              "R1",
+              "R2",
+              "R3",
+              "DF"
+            ],
             "description": "Settlement run type (II: Interim Initial +5 days, SF: Settlement Final +17 days, R1: First Reconciliation +35 days, R2: Second Reconciliation +80 days, R3: Third Reconciliation, DF: Data Freeze)"
           },
           "elexon_processing_date": {

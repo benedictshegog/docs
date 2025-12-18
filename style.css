@@ -1,0 +1,22 @@
+/* Custom table column widths for ESNA documentation */
+table th {
+  text-align: left;
+}
+
+table th:first-child,
+table td:first-child {
+  width: 15%;
+  min-width: 100px;
+  white-space: nowrap;
+}
+
+table th:nth-child(2),
+table td:nth-child(2) {
+  width: 20%;
+  min-width: 100px;
+}
+
+table th:nth-child(3),
+table td:nth-child(3) {
+  width: 55%;
+}

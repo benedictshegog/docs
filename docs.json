@@ -14,9 +14,11 @@
         "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index"
+              "welcome",
+              "esna-flow",
+              "concepts"
             ]
           }
         ]

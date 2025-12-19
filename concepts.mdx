@@ -1,0 +1,97 @@
+---
+title: "Concepts"
+description: "Key terms and definitions for the ESNA Data Upload API"
+---
+
+## ESNA
+
+**Exempt Supplier Notification Agent** - The designated agent responsible for submitting generation and consumption data to the Settlement Administration Agent (SAA) on behalf of exempt electricity suppliers. Granular Energy acts as your ESNA agent.
+
+## LES Contract
+
+**License Exempt Supply Contract** - An agreement that links generators (supply) with consumers (demand) for license exempt supply arrangements. LES contracts define which metering points participate in local matching and settlement.
+
+## Portfolios
+
+### Demand Portfolio
+
+A collection of **consumers** and their associated metering points. Each consumer represents a demand-side entity (e.g., a building, business, or site) that consumes electricity.
+
+- Managed via `/portfolio/demand/upload` and `/portfolio/demand/download`
+- Requires `BMUnitIdentifier` tag for ESNA submissions
+
+### Supply Portfolio
+
+A collection of **generators** (production devices) and their associated metering points. Each generator represents a supply-side entity (e.g., a solar farm, wind turbine, or other generation asset).
+
+- Managed via `/portfolio/supply/upload` and `/portfolio/supply/download`
+- Supports optional `production_device_bm_unit_identifier` for BMU registration
+
+## BMU Identifier
+
+**Balancing Mechanism Unit Identifier** - A unique identifier for balancing mechanism units in Great Britain's electricity market.
+
+**Format:** Must start with `2__` followed by a GSP Group ID (letters A through P), then additional identifying characters.
+
+**Examples:**
+- `2__A_MYSITE_001`
+- `2__G_FACTORY_123`
+- `2__P_SOLAR_FARM`
+
+For demand portfolios, this is provided via the `BMUnitIdentifier` column. For supply portfolios, use `production_device_bm_unit_identifier`.
+
+## MPAN
+
+**Metering Point Administration Number** - The official identifier for a metering point on the electricity network in Great Britain. In the API, this is referred to as `metering_point_grid_identifier`.
+
+## Settlement Runs
+
+Settlement runs are the periodic processes where generation and consumption data is reconciled. Each run type represents a different stage in the settlement timeline:
+
+| Run | Name | Timing |
+|-----|------|--------|
+| **SF** | Settlement Final | +17 working days after settlement date |
+| **R1** | First Reconciliation | +35 working days |
+| **R2** | Second Reconciliation | +80 working days |
+| **R3** | Third Reconciliation | +14 months |
+| **DF** | Dispute Final | Final reconciliation |
+
+You can track submission deadlines via the [Expected Upload Calendar](/api-reference/endpoint/get-esna-expected-upload-calendar) endpoint.
+
+## Granularity
+
+The time resolution of metering data. Specified using ISO 8601 duration format.
+
+**For ESNA, granularity is always `PT30M` (30 minutes)** to align with the standard UK settlement period.
+
+| Value | Duration |
+|-------|----------|
+| `PT5M` | 5 minutes |
+| `PT15M` | 15 minutes |
+| `PT30M` | 30 minutes (ESNA / UK settlement period) |
+| `PT1H` | 1 hour |
+| `P1D` | 1 day |
+| `P1M` | 1 month |
+
+## Allocation
+
+The process of matching supply (generation) with demand (consumption) within a settlement period. Allocations are calculated by Granular Energy based on your uploaded metering data and contract configurations.
+
+- **Unadjusted allocations** - Raw allocation volumes before any adjustments, available via `/esna/unadjusted-allocations`
+- Used for Ofgem reporting requirements
+
+## File Processing Status
+
+When you upload a file, it goes through several processing stages:
+
+| Status | Description |
+|--------|-------------|
+| `UPLOADED` | File received by Granular |
+| `STORED` | File stored and ready for processing |
+| `QUEUED` | File in processing queue |
+| `PROCESSING` | Validation in progress |
+| `NOT_COMPLIANT` | Validation failed (see `errors` field) |
+| `SUCCESSFUL` | Data saved to platform |
+| `FAILED` | Processing error occurred |
+
+Use `isProcessingFinished` and `isProcessingSuccessful` flags to determine file status in your application logic.

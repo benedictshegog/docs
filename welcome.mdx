@@ -1,0 +1,62 @@
+---
+title: "Welcome"
+description: "Introduction to the Granular Energy ESNA Data Upload API"
+---
+
+## What is ESNA?
+
+ESNA (Exempt Supplier Notification Agent) is the mechanism through which exempt electricity suppliers in Great Britain submit their generation and consumption data to the Settlement Administration Agent (SAA) for balancing and settlement purposes.
+
+Granular Energy acts as your ESNA agent, handling the submission of allocation data to the SAA on your behalf.
+
+## What This API Does
+
+The Granular Energy Data Upload API allows you to:
+
+1. **Manage your portfolio** - Register and maintain your demand (consumers) and supply (generators) portfolios
+2. **Upload metering data** - Submit generation and consumption measurements for settlement
+3. **Track contracts** - Create and manage LES (License Exempt Supply) contracts linking your generators and consumers
+4. **Monitor allocations** - Retrieve allocation results for Ofgem reporting
+
+## Who Is This For?
+
+This documentation is for energy suppliers and their technical teams who need to:
+
+- Integrate with Granular Energy's ESNA submission service
+- Automate portfolio and metering data uploads
+- Retrieve settlement data for regulatory reporting
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card title="ESNA Flow" icon="route" href="/esna-flow">
+    Step-by-step guide to the complete ESNA workflow
+  </Card>
+  <Card title="Concepts" icon="book" href="/concepts">
+    Key terms and definitions
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Complete API endpoint documentation
+  </Card>
+  <Card
+    title="Contact Support"
+    icon="envelope"
+    href="mailto:support@granular-energy.com"
+  >
+    Get help with your integration
+  </Card>
+</CardGroup>
+
+## Authentication
+
+All API requests require a bearer token passed via the `Authorization` header. Contact [support@granular-energy.com](mailto:support@granular-energy.com) to request API credentials with the appropriate scopes for your use case.
+
+## Rate Limits
+
+To protect service availability, upload endpoints are subject to rate limits:
+
+| Limit Type            | Value              |
+| --------------------- | ------------------ |
+| File uploads          | 5 calls per minute |
+| Maximum file size     | 200 MB             |
+| Measurements per file | 1 million          |

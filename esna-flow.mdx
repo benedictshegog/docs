@@ -1,0 +1,215 @@
+---
+title: "ESNA Flow"
+description: "Step-by-step guide to the complete ESNA workflow"
+---
+
+This guide walks you through the complete workflow for submitting ESNA data through the Granular Energy platform.
+
+## Overview
+
+1. **Create Portfolios** - Register your demand (consumers) and supply (generators)
+2. **Create Contracts** - Link consumers and generators via LES contracts
+3. **Upload Metering Data** - Submit generation and consumption measurements
+4. **Allocations Run** - Granular processes your data per the settlement calendar
+5. **Fetch Results** - Retrieve unadjusted allocations for Ofgem reporting
+
+## 1. Create Your Demand Portfolio
+
+The demand portfolio contains your **consumers** - the entities that consume electricity. Each consumer has one or more metering points.
+
+### Required Columns
+
+Upload a CSV file with these columns:
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `consumer_reference` | Yes | Your unique identifier for the consumer |
+| `consumer_name` | No | Human-readable name (defaults to reference) |
+| `consumer_country` | Yes | ISO country code (e.g., `GB`) |
+| `metering_point_reference` | Yes | Your unique identifier for the meter |
+| `metering_point_grid_identifier` | No | Official MPAN |
+| `measurement_granularity` | Yes | Data resolution (e.g., `PT30M`) |
+| `BMUnitIdentifier` | Yes | BMU identifier (e.g., `2__A_SITE_001`) |
+
+<Note>
+The `BMUnitIdentifier` column is **required** for ESNA submissions. It must follow the format `2__X...` where `X` is a GSP Group ID (A-P).
+</Note>
+
+### Example CSV
+
+```csv
+consumer_reference,consumer_name,consumer_country,metering_point_reference,metering_point_grid_identifier,measurement_granularity,BMUnitIdentifier
+CUST_001,Acme Corp,GB,MPAN_001,1234567890123,PT30M,2__A_ACME_001
+CUST_001,Acme Corp,GB,MPAN_002,1234567890124,PT30M,2__A_ACME_002
+CUST_002,Beta Ltd,GB,MPAN_003,1234567890125,PT30M,2__B_BETA_001
+```
+
+### Upload Endpoint
+
+<Card title="POST /portfolio/demand/upload" icon="upload" href="/api-reference/endpoint/post-portfolio-demand-upload">
+  Upload your demand portfolio CSV file
+</Card>
+
+---
+
+## 2. Create Your Supply Portfolio
+
+The supply portfolio contains your **generators** - the production devices that generate electricity.
+
+### Required Columns
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `production_device_reference` | Yes | Your unique identifier for the generator |
+| `production_device_name` | No | Human-readable name |
+| `production_device_country` | Yes | ISO country code (e.g., `GB`) |
+| `technology` | Yes | Generation type (`SOLAR`, `WIND`, etc.) |
+| `metering_point_reference` | Yes | Your unique identifier for the meter |
+| `metering_point_grid_identifier` | No | Official MPAN |
+| `production_device_bm_unit_identifier` | No | BMU identifier for the generator |
+
+### Example CSV
+
+```csv
+production_device_reference,production_device_name,production_device_country,technology,metering_point_reference,metering_point_grid_identifier,production_device_bm_unit_identifier
+SOLAR_001,Solar Farm Alpha,GB,SOLAR,METER_001,9876543210123,2__A_SOLAR_001
+WIND_001,Wind Farm Beta,GB,WIND,METER_002,9876543210124,2__G_WIND_001
+```
+
+### Upload Endpoint
+
+<Card title="POST /portfolio/supply/upload" icon="upload" href="/api-reference/endpoint/post-portfolio-supply-upload">
+  Upload your supply portfolio CSV file
+</Card>
+
+---
+
+## 3. Create LES Contracts
+
+LES (License Exempt Supply) contracts link your consumers and generators together. A contract defines which metering points participate in local matching.
+
+### Contract Structure
+
+Each contract has:
+- A unique **reference** identifier
+- A **start date** and optional **end date**
+- A **status** (`DRAFT`, `ACTIVE`, or `INACTIVE`)
+- **Memberships** linking assets (generators) and counterparties (consumers)
+
+### Creating a Contract
+
+1. **Create the contract** via `POST /esna/contracts`
+2. **Add memberships** for each generator and consumer via `POST /esna/contracts/{contract_id}/memberships`
+3. **Upload a PDF** (optional) via `POST /esna/contracts/{contract_id}/upload`
+
+<CardGroup cols={2}>
+  <Card title="Create Contract" icon="file-contract" href="/api-reference/endpoint/post-esna-contracts">
+    POST /esna/contracts
+  </Card>
+  <Card title="Add Membership" icon="user-plus" href="/api-reference/endpoint/post-esna-contracts-contract-id-memberships">
+    POST /esna/contracts/{contract_id}/memberships
+  </Card>
+</CardGroup>
+
+---
+
+## 4. Upload Metering Data
+
+Once your portfolios and contracts are set up, you can upload metering data for each settlement period.
+
+### Which MPANs to Upload?
+
+Fetch the list of metering points that are part of your active contracts:
+
+<Card title="GET /esna/contracts/les-mpans" icon="list" href="/api-reference/endpoint/get-esna-contracts-les-mpans">
+  Get all MPANs associated with your LES contracts
+</Card>
+
+### Upload Generation Data
+
+Submit generation measurements for your supply portfolio metering points.
+
+```csv
+metering_point,period_start,unadjusted_quantity,adjusted_quantity
+METER_001,2024-01-01T00:00:00+00:00,1500.5,
+METER_001,2024-01-01T00:30:00+00:00,1520.0,1525.0
+```
+
+<Card title="POST /esna/generation-measurements/files/upload" icon="solar-panel" href="/api-reference/endpoint/post-esna-generation-measurements-files-upload">
+  Upload generation metering data
+</Card>
+
+### Upload Consumption Data
+
+Submit consumption measurements for your demand portfolio metering points.
+
+```csv
+metering_point,period_start,unadjusted_quantity,adjusted_quantity
+MPAN_001,2024-01-01T00:00:00+00:00,850.2,
+MPAN_001,2024-01-01T00:30:00+00:00,865.5,870.0
+```
+
+<Card title="POST /esna/consumption-measurements/files/upload" icon="building" href="/api-reference/endpoint/post-esna-consumption-measurements-files-upload">
+  Upload consumption metering data
+</Card>
+
+---
+
+## 5. Track Upload Deadlines
+
+Granular Energy processes your data according to the settlement calendar. Each settlement date has specific deadlines for each settlement run (SF, R1, R2, R3, DF).
+
+<Card title="GET /esna/expected-upload-calendar" icon="calendar" href="/api-reference/endpoint/get-esna-expected-upload-calendar">
+  View upload deadlines and submission status
+</Card>
+
+The calendar shows:
+- **Settlement date** - The date being settled
+- **Settlement run** - The run type (SF, R1, R2, R3, DF)
+- **Submission deadline** - When you must upload your data
+- **Current status** - Whether data has been received, validated, and submitted to SAA
+
+---
+
+## 6. Fetch Allocation Results
+
+After allocations are processed, you can retrieve the results for Ofgem reporting.
+
+<Card title="GET /esna/unadjusted-allocations" icon="chart-pie" href="/api-reference/endpoint/get-esna-unadjusted-allocations">
+  Get unadjusted allocation volumes
+</Card>
+
+The unadjusted allocations endpoint returns:
+- Allocation volume per settlement period
+- Associated supply and demand volume IDs
+- Counterparty and asset identifiers
+- Supply technology and country
+
+<Note>
+Unadjusted allocations are the raw allocation data before any adjustments. This is the data required for Ofgem reporting purposes.
+</Note>
+
+---
+
+## Complete Workflow Summary
+
+<Steps>
+  <Step title="Set up portfolios">
+    Upload your demand portfolio (with BMUnitIdentifier) and supply portfolio CSV files
+  </Step>
+  <Step title="Create contracts">
+    Create LES contracts linking your consumers and generators
+  </Step>
+  <Step title="Check MPANs in scope">
+    Use `/esna/contracts/les-mpans` to verify which metering points need data
+  </Step>
+  <Step title="Upload metering data">
+    Submit generation and consumption data before the settlement deadline
+  </Step>
+  <Step title="Monitor calendar">
+    Track your submission status via the expected upload calendar
+  </Step>
+  <Step title="Retrieve allocations">
+    Fetch unadjusted allocations for Ofgem reporting
+  </Step>
+</Steps>

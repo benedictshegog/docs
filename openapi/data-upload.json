@@ -22,7 +22,7 @@
     },
     {
       "name": "contracts",
-      "description": "Manage ESNA LES (License Exempt Supply) contracts and memberships"
+      "description": "Manage ESNA LES (License Exempt Supply) contracts and memberships.\n\n## ESNA Contract Setup Flow\n\nFollow these steps to set up ESNA contracts:\n\n1. **Upload portfolio data** - Register your assets (generators) via supply portfolio and counterparties (consumers) via demand portfolio\n2. **Get CSV schema** - Optionally use `GET /esna/contracts/files/upload/schema` to understand the required format\n3. **Bulk upload contracts** - Use `POST /esna/contracts/files/upload` to create contracts linking assets and counterparties\n4. **Check upload status** - Use `GET /esna/contracts/files/{file_id}` to verify contracts were created successfully\n5. **List/get contracts** - Use `GET /esna/contracts` or `GET /esna/contracts/{contract_id}` to view created contracts\n6. **Upload membership PDFs** - For each membership, upload the PDF via `POST /esna/contracts/{contract_id}/membership/{membership_id}/upload`\n7. **Activate contracts** - Update contract status to `ACTIVE` via `PUT /esna/contracts/{contract_id}`"
     },
     {
       "name": "upload-calendar",
@@ -702,7 +702,7 @@
           "contracts"
         ],
         "summary": "List ESNA LES contracts",
-        "description": "List all ESNA LES (License Exempt Supply) contracts in your organization.",
+        "description": "List all ESNA LES (License Exempt Supply) contracts in your organization.\n\n### ESNA Contract Setup Flow\nThis endpoint is part of the ESNA contract setup workflow. Use it to view all contracts after bulk upload or individual creation. Filter by status to find contracts that need activation.",
         "operationId": "listESNAContracts",
         "parameters": [
           {
@@ -866,13 +866,156 @@
         ]
       }
     },
+    "/esna/contracts/files/upload": {
+      "post": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Bulk upload LES contracts",
+        "description": "### Overview\nUpload a CSV file to bulk create LES (License Exempt Supply) contracts with their memberships.\n\n### ESNA Contract Setup Flow\nThis endpoint is part of the ESNA contract setup workflow:\n1. **Upload portfolio data** - Use the portfolio endpoints to register your assets (generation) and counterparties (consumption) with their metering points\n2. **Bulk upload contracts** - Use this endpoint to create LES contracts linking assets and counterparties (this step)\n3. **Check upload status** - Use `GET /esna/contracts/files/{file_id}` to verify the upload processed successfully\n4. **Upload membership PDFs** - For each membership, upload the PDF contract document via `POST /esna/contracts/{contract_id}/membership/{membership_id}/upload`\n5. **Activate contracts** - Update contract status to `ACTIVE` via `PUT /esna/contracts/{contract_id}`\n\n### File Requirements\nPlease ensure your CSV file has the following columns:\n\n| Column Name | Format | Description |\n| --- | --- | --- |\n| contract_reference | string | Unique identifier for the contract within your organization |\n| contract_start_date | YYYY-MM-DD | Contract start date |\n| contract_end_date (optional) | YYYY-MM-DD | Contract end date (leave empty for ongoing contracts) |\n| member_type | string | Type of member: `asset` or `counterparty` |\n| member_client_reference | string | Client reference of the asset or counterparty |\n| membership_start_date | YYYY-MM-DD | Date when this member joins the contract |\n| membership_end_date (optional) | YYYY-MM-DD | Date when this member leaves the contract |\n\n**Example CSV format:**\n```csv\ncontract_reference,contract_start_date,contract_end_date,member_type,member_client_reference,membership_start_date,membership_end_date\nLES-2024-001,2024-01-01,2024-12-31,asset,SOLAR-FARM-001,2024-01-01,2024-12-31\nLES-2024-001,2024-01-01,2024-12-31,counterparty,CUSTOMER-ABC,2024-01-01,2024-06-30\nLES-2024-002,2024-06-01,,asset,WIND-FARM-002,2024-06-01,\n```\n\n**Notes:**\n- Multiple rows with the same `contract_reference` will be grouped into a single contract\n- Each contract must have consistent `contract_start_date` and `contract_end_date` values across all its rows\n- All contracts are created with `DRAFT` status. Use `PUT /esna/contracts/{contract_id}` to activate them after uploading required PDF documents\n- The `member_client_reference` must match an existing asset or counterparty in your organization\n\n### File Processing\nThe uploaded file is queued for processing. Use the returned `id` to check the processing status via the `GET /esna/contracts/files/{file_id}` endpoint.\n\n### Rate Limit\nMaximum 5 calls per minute. Subsequent calls are subject to an HTTP status code of 429 (too many requests).",
+        "operationId": "uploadLESContractFile",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV file containing LES contract data"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Upload accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadId"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Generic429"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "write:esna"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/contracts/files/{file_id}": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Check LES contract file upload status",
+        "description": "Check the processing status of an LES contract bulk upload.\n\n### ESNA Contract Setup Flow\nThis endpoint is part of the ESNA contract setup workflow:\n1. **Upload portfolio data** - Use the portfolio endpoints to register your assets and counterparties\n2. **Bulk upload contracts** - Use `POST /esna/contracts/files/upload` to create LES contracts\n3. **Check upload status** - Use this endpoint to verify the upload processed successfully (this step)\n4. **Upload membership PDFs** - Upload PDF documents for each membership\n5. **Activate contracts** - Update contract status to `ACTIVE`\n\n### Response Fields\n- `processingFinished: true` indicates processing is complete\n- `processingSuccessful: true` indicates the file passed validation and contracts were created\n- If validation failed, errors will be listed in the `errors` field\n- On success, the `report` field contains counts of created contracts and memberships",
+        "operationId": "getLESContractFileStatus",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "description": "The file upload ID returned from the upload endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LESContractFileUpload"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          },
+          "404": {
+            "description": "File upload not found"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna"
+            ]
+          }
+        ]
+      }
+    },
+    "/esna/contracts/files/upload/schema": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Get LES contract CSV schema",
+        "description": "Returns the expected CSV schema for LES contract bulk uploads, including required columns and their formats. Use this to validate your CSV structure before uploading.\n\n### ESNA Contract Setup Flow\nThis endpoint is part of the ESNA contract setup workflow:\n1. **Upload portfolio data** - Register your assets and counterparties\n2. **Get CSV schema** - Use this endpoint to understand the required format (this step)\n3. **Bulk upload contracts** - Use `POST /esna/contracts/files/upload` to create contracts\n4. **Check upload status** - Verify the upload processed successfully\n5. **Upload membership PDFs** - Upload PDF documents for each membership\n6. **Activate contracts** - Update contract status to `ACTIVE`",
+        "operationId": "getLESContractUploadSchema",
+        "responses": {
+          "200": {
+            "description": "CSV schema definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CSVSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Generic401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Generic403"
+          }
+        },
+        "security": [
+          {
+            "bearer-token": [
+              "read:esna"
+            ]
+          }
+        ]
+      }
+    },
     "/esna/contracts/{contract_id}": {
       "get": {
         "tags": [
           "contracts"
         ],
         "summary": "Get ESNA LES contract",
-        "description": "Get a specific ESNA LES contract by ID.",
+        "description": "Get a specific ESNA LES contract by ID.\n\n### ESNA Contract Setup Flow\nThis endpoint is part of the ESNA contract setup workflow. Use it to retrieve contract details including memberships and their PDF upload status.",
         "operationId": "getESNAContract",
         "parameters": [
           {
@@ -920,7 +1063,7 @@
           "contracts"
         ],
         "summary": "Update ESNA LES contract",
-        "description": "Update an existing ESNA LES contract.",
+        "description": "Update an existing ESNA LES contract.\n\n### ESNA Contract Setup Flow\nThis endpoint is the final step in the contract setup workflow. After uploading membership PDF documents, use this endpoint to change the contract status from `DRAFT` to `ACTIVE`. You can also update other contract fields like reference, start_date, and end_date.",
         "operationId": "updateESNAContract",
         "parameters": [
           {
@@ -2674,6 +2817,86 @@
           },
           "report": {
             "$ref": "#/components/schemas/SupplyPortfolioFileUploadReport"
+          }
+        }
+      },
+      "LESContractFileUploadReport": {
+        "type": "object",
+        "required": [
+          "createdContractCount",
+          "createdMembershipCount"
+        ],
+        "properties": {
+          "createdContractCount": {
+            "type": "integer",
+            "description": "Number of contracts created from the upload"
+          },
+          "createdMembershipCount": {
+            "type": "integer",
+            "description": "Number of memberships created across all contracts"
+          }
+        }
+      },
+      "LESContractFileUpload": {
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "uploadedAt",
+          "status",
+          "processingFinished"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the uploaded file"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Name of the uploaded file"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the file was uploaded"
+          },
+          "uploadedBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Identifier of the API key used for the upload"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UPLOADED",
+              "STORED",
+              "QUEUED",
+              "PROCESSING",
+              "NOT_COMPLIANT",
+              "SUCCESSFUL",
+              "FAILED"
+            ],
+            "description": "Current processing status of the file:\n- `UPLOADED`: File has been received\n- `STORED`: File has been stored ready for processing\n- `QUEUED`: File is in the queue awaiting processing\n- `PROCESSING`: File data is undergoing validation\n- `NOT_COMPLIANT`: File has failed validation\n- `SUCCESSFUL`: File has passed validation and contracts have been created\n- `FAILED`: Something went wrong during processing"
+          },
+          "processingFinished": {
+            "type": "boolean",
+            "description": "Whether file processing is complete"
+          },
+          "processingSuccessful": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether processing completed successfully. Null if processing is not finished."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileUploadError"
+            },
+            "description": "List of validation errors, if any. Common error codes include:\n- `MISSING_COLUMN`: Required column missing from CSV\n- `MISSING_REQUIRED_VALUE`: Required field is empty\n- `INVALID_DATE`: Date format is invalid (expected YYYY-MM-DD)\n- `INVALID_MEMBER_TYPE`: Member type must be 'asset' or 'counterparty'\n- `ASSET_NOT_FOUND`: Asset with given client_reference not found\n- `COUNTERPARTY_NOT_FOUND`: Counterparty with given client_reference not found\n- `CONTRACT_REFERENCE_EXISTS`: Contract with this reference already exists\n- `END_DATE_BEFORE_START`: End date is before start date\n- `MEMBERSHIP_OUTSIDE_CONTRACT_BOUNDS`: Membership dates fall outside contract date range\n- `DUPLICATE_MEMBERSHIP`: Same asset/counterparty appears twice in the same contract"
+          },
+          "report": {
+            "$ref": "#/components/schemas/LESContractFileUploadReport"
           }
         }
       },

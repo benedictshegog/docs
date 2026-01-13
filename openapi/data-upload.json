@@ -2177,6 +2177,16 @@
             "nullable": true,
             "description": "ID of the counterparty (consumption/demand entity). Either asset_id OR counterparty_id will be set, never both. When set, this membership represents demand/consumption participating in the LES contract."
           },
+          "asset_reference": {
+            "type": "string",
+            "nullable": true,
+            "description": "Client reference for the asset, if asset_id is set"
+          },
+          "counterparty_reference": {
+            "type": "string",
+            "nullable": true,
+            "description": "Client reference for the counterparty, if counterparty_id is set"
+          },
           "asset_name": {
             "type": "string",
             "nullable": true,

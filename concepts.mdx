@@ -19,7 +19,7 @@ A collection of **consumers** and their associated metering points. Each consume
 
 - Upload via the **Platform UI** at `/import/portfolio-data` → Consumption meters portfolio, or via **API** at `/portfolio/demand/upload`
 - Download via `/portfolio/demand/download`
-- Requires `BMUnitIdentifier` tag for ESNA submissions
+- Requires `BMUnitIdentifier` tag and `metering_point_grid_identifier` (MPAN) for ESNA submissions
 - **Note:** For ESNA organisations, consumers must be created via CSV upload (not manually in the UI) because the UI does not yet support adding required tags
 
 ### Supply Portfolio
@@ -28,24 +28,43 @@ A collection of **generators** (production devices) and their associated meterin
 
 - Upload via the **Platform UI** at `/import/portfolio-data` → Production devices portfolio, or via **API** at `/portfolio/supply/upload`
 - Download via `/portfolio/supply/download`
-- Supports optional `production_device_bm_unit_identifier` for BMU registration
+- Requires `production_device_bm_unit_identifier` (BMU) and `metering_point_grid_identifier` (MPAN) for ESNA organisations
 
 ## BMU Identifier
 
-**Balancing Mechanism Unit Identifier** - A unique identifier for balancing mechanism units in Great Britain's electricity market.
+**Balancing Mechanism Unit Identifier** - A unique identifier for balancing mechanism units in Great Britain's electricity market. Required for ESNA organisations.
 
-**Format:** Must start with `2__` followed by a GSP Group ID (letters A through P), then additional identifying characters.
+**Format:** Must match the pattern `2__[GSP Group ID][alphanumeric]`:
+- Starts with literal `2__` prefix
+- Followed by a GSP Group ID: letters **A-H, J-N, or P** (letters I and O are excluded)
+- Followed by alphanumeric characters
 
-**Examples:**
-- `2__A_MYSITE_001`
-- `2__G_FACTORY_123`
-- `2__P_SOLAR_FARM`
+**Valid examples:**
+- `2__ASITE001`
+- `2__GFARM456`
+- `2__PWIND123`
+
+**Invalid examples:**
+- `2__ISITE001` (I is not a valid GSP Group ID)
+- `2__OWIND123` (O is not a valid GSP Group ID)
+- `3__ASITE001` (wrong prefix)
 
 For demand portfolios, this is provided via the `BMUnitIdentifier` column. For supply portfolios, use `production_device_bm_unit_identifier`.
 
 ## MPAN
 
-**Metering Point Administration Number** - The official identifier for a metering point on the electricity network in Great Britain. In the API, this is referred to as `metering_point_grid_identifier`.
+**Metering Point Administration Number** - The official identifier for a metering point on the electricity network in Great Britain. In the API, this is referred to as `metering_point_grid_identifier`. Required for ESNA organisations.
+
+**Format:** Must be exactly **21 characters** with the following structure:
+- Positions 1-5: Profile + MTC (5 digits)
+- Positions 6-8: LLF Class (3 alphanumeric characters, may include spaces but not all spaces)
+- Positions 9-21: Distributor + Unique ID + Check digit (13 digits)
+
+**Example:** `00000AL11234567890123`
+
+<Note>
+ESNA requires full 21-character MPANs to extract the LLF Class for DLF (Distribution Loss Factor) lookups. The older 13-digit format is not accepted.
+</Note>
 
 ## Settlement Runs
 

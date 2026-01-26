@@ -29,27 +29,49 @@ For ESNA organisations, consumers cannot be created manually via the UI because 
 
 Upload a CSV file with these columns:
 
-| Column | Required | Description |
-|--------|----------|-------------|
+| Column | Required for ESNA | Description |
+|--------|-------------------|-------------|
 | `consumer_reference` | Yes | Your unique identifier for the consumer |
 | `consumer_name` | No | Human-readable name (defaults to reference) |
 | `consumer_country` | Yes | ISO country code (e.g., `GB`) |
 | `metering_point_reference` | Yes | Your unique identifier for the meter |
-| `metering_point_grid_identifier` | No | Official MPAN |
-| `measurement_granularity` | Yes | Data resolution (e.g., `PT30M`) |
-| `BMUnitIdentifier` | Yes | BMU identifier (e.g., `2__A_SITE_001`) |
+| `metering_point_grid_identifier` | **Yes** | Official MPAN (21 characters) |
+| `measurement_granularity` | Yes | Data resolution - must be `PT30M` for ESNA |
+| `BMUnitIdentifier` | **Yes** | BMU identifier (e.g., `2__ASITE001`) |
+
+### ESNA Validation Requirements
 
 <Note>
-The `BMUnitIdentifier` column is **required** for ESNA submissions. It must follow the format `2__X...` where `X` is a GSP Group ID (A-P).
+**BMU Identifier Format**
+
+Must match the pattern `2__[GSP Group ID][alphanumeric]`:
+- Starts with literal `2__` prefix
+- Followed by a GSP Group ID: letters **A-H, J-N, or P** (letters I and O are excluded)
+- Followed by alphanumeric characters
+
+Valid examples: `2__ASITE001`, `2__PWIND123`, `2__GFARM456`
+
+Invalid examples: `2__ISITE001` (I not allowed), `2__OWIND123` (O not allowed), `3__ASITE001` (wrong prefix)
+</Note>
+
+<Note>
+**MPAN Format**
+
+Must be exactly **21 characters** with the following structure:
+- Positions 1-5: Profile + MTC (5 digits)
+- Positions 6-8: LLF Class (3 alphanumeric characters, may include spaces but not all spaces)
+- Positions 9-21: Distributor + Unique ID + Check digit (13 digits)
+
+Valid example: `00000AL11234567890123`
 </Note>
 
 ### Example CSV
 
 ```csv
 consumer_reference,consumer_name,consumer_country,metering_point_reference,metering_point_grid_identifier,measurement_granularity,BMUnitIdentifier
-CUST_001,Acme Corp,GB,MPAN_001,1234567890123,PT30M,2__A_ACME_001
-CUST_001,Acme Corp,GB,MPAN_002,1234567890124,PT30M,2__A_ACME_002
-CUST_002,Beta Ltd,GB,MPAN_003,1234567890125,PT30M,2__B_BETA_001
+CUST_001,Acme Corp,GB,MPAN_001,00000AL11234567890123,PT30M,2__AACME001
+CUST_001,Acme Corp,GB,MPAN_002,00000AL11234567890124,PT30M,2__AACME002
+CUST_002,Beta Ltd,GB,MPAN_003,00000BL21234567890125,PT30M,2__BBETA001
 ```
 
 ### Upload Endpoint
@@ -70,22 +92,26 @@ You can upload your supply portfolio via:
 
 ### Required Columns
 
-| Column | Required | Description |
-|--------|----------|-------------|
+| Column | Required for ESNA | Description |
+|--------|-------------------|-------------|
 | `production_device_reference` | Yes | Your unique identifier for the generator |
 | `production_device_name` | No | Human-readable name |
 | `production_device_country` | Yes | ISO country code (e.g., `GB`) |
 | `technology` | Yes | Generation type (`SOLAR`, `WIND`, etc.) |
 | `metering_point_reference` | Yes | Your unique identifier for the meter |
-| `metering_point_grid_identifier` | No | Official MPAN |
-| `production_device_bm_unit_identifier` | No | BMU identifier for the generator |
+| `metering_point_grid_identifier` | **Yes** | Official MPAN (21 characters) |
+| `production_device_bm_unit_identifier` | **Yes** | BMU identifier for the generator |
+
+<Note>
+For ESNA organisations, both `metering_point_grid_identifier` (MPAN) and `production_device_bm_unit_identifier` (BMU) are required. See the [demand portfolio section](#esna-validation-requirements) above for format requirements.
+</Note>
 
 ### Example CSV
 
 ```csv
 production_device_reference,production_device_name,production_device_country,technology,metering_point_reference,metering_point_grid_identifier,production_device_bm_unit_identifier
-SOLAR_001,Solar Farm Alpha,GB,SOLAR,METER_001,9876543210123,2__A_SOLAR_001
-WIND_001,Wind Farm Beta,GB,WIND,METER_002,9876543210124,2__G_WIND_001
+SOLAR_001,Solar Farm Alpha,GB,SOLAR,METER_001,00000AL19876543210123,2__ASOLAR01
+WIND_001,Wind Farm Beta,GB,WIND,METER_002,00000GL29876543210124,2__GWIND001
 ```
 
 ### Upload Endpoint

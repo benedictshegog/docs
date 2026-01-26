@@ -38,6 +38,8 @@ Upload a CSV file with these columns:
 | `metering_point_grid_identifier` | **Yes** | Official MPAN (21 characters) |
 | `measurement_granularity` | Yes | Data resolution - must be `PT30M` for ESNA |
 | `BMUnitIdentifier` | **Yes** | BMU identifier (e.g., `2__ASITE001`) |
+| `start_date` | No | Date from when the metering point is contracted (YYYY-MM-DD). If omitted, assumes unbounded start. |
+| `end_date` | No | Date until when the metering point is contracted (YYYY-MM-DD). If omitted, assumes unbounded end. |
 
 ### ESNA Validation Requirements
 

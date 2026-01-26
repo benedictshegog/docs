@@ -17,6 +17,14 @@ This guide walks you through the complete workflow for submitting ESNA data thro
 
 The demand portfolio contains your **consumers** - the entities that consume electricity. Each consumer has one or more metering points.
 
+You can upload your demand portfolio via:
+- **Platform UI**: Navigate to `/import/portfolio-data` and select "Consumption meters portfolio"
+- **API**: Use the upload endpoint below
+
+<Warning>
+For ESNA organisations, consumers cannot be created manually via the UI because the platform requires tags (such as `BMUnitIdentifier`) which are not yet supported in the UI. You must create consumers via CSV upload.
+</Warning>
+
 ### Required Columns
 
 Upload a CSV file with these columns:
@@ -55,6 +63,10 @@ CUST_002,Beta Ltd,GB,MPAN_003,1234567890125,PT30M,2__B_BETA_001
 ## 2. Create Your Supply Portfolio
 
 The supply portfolio contains your **generators** - the production devices that generate electricity.
+
+You can upload your supply portfolio via:
+- **Platform UI**: Navigate to `/import/portfolio-data` and select "Production devices portfolio"
+- **API**: Use the upload endpoint below
 
 ### Required Columns
 

@@ -35,9 +35,9 @@ Upload a CSV file with these columns:
 | `consumer_name` | No | Human-readable name (defaults to reference) |
 | `consumer_country` | Yes | ISO country code (e.g., `GB`) |
 | `metering_point_reference` | Yes | Your unique identifier for the meter |
-| `metering_point_grid_identifier` | **Yes** | Official MPAN (21 characters) |
+| `metering_point_grid_identifier` | Yes | Official MPAN (21 characters) |
 | `measurement_granularity` | Yes | Data resolution - must be `PT30M` for ESNA |
-| `BMUnitIdentifier` | **Yes** | BMU identifier (e.g., `2__ASITE001`) |
+| `BMUnitIdentifier` | Yes | BMU identifier (e.g., `2__ASITE001`) |
 | `start_date` | No | Date from when the metering point is contracted (YYYY-MM-DD). If omitted, assumes unbounded start. |
 | `end_date` | No | Date until when the metering point is contracted (YYYY-MM-DD). If omitted, assumes unbounded end. |
 
@@ -101,8 +101,8 @@ You can upload your supply portfolio via:
 | `production_device_country` | Yes | ISO country code (e.g., `GB`) |
 | `technology` | Yes | Generation type (`SOLAR`, `WIND`, etc.) |
 | `metering_point_reference` | Yes | Your unique identifier for the meter |
-| `metering_point_grid_identifier` | **Yes** | Official MPAN (21 characters) |
-| `production_device_bm_unit_identifier` | **Yes** | BMU identifier for the generator |
+| `metering_point_grid_identifier` | Yes | Official MPAN (21 characters) |
+| `production_device_bm_unit_identifier` | Yes | BMU identifier for the generator |
 
 <Note>
 For ESNA organisations, both `metering_point_grid_identifier` (MPAN) and `production_device_bm_unit_identifier` (BMU) are required. See the [demand portfolio section](#esna-validation-requirements) above for format requirements.
